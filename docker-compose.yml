@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: websitebuilder-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: websitebuilder
+    # Deliberately not 5432: this port is free alongside the other databases that
+    # tend to be running locally.
+    ports:
+      - "55440:5432"
+    volumes:
+      - websitebuilder-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  websitebuilder-db:

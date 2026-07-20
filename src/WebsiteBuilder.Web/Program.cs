@@ -5,6 +5,7 @@ using WebsiteBuilder.Core.Tenancy;
 using WebsiteBuilder.Data;
 using WebsiteBuilder.Web.Caching;
 using WebsiteBuilder.Web.Components;
+using WebsiteBuilder.Web.Development;
 using WebsiteBuilder.Web.Middleware;
 using WebsiteBuilder.Web.Publishing;
 
@@ -51,6 +52,11 @@ if (app.Configuration.GetValue("RunMigrationsOnStartup", true))
 {
     using var scope = app.Services.CreateScope();
     await scope.ServiceProvider.GetRequiredService<WebsiteBuilderDbContext>().Database.MigrateAsync();
+}
+
+if (app.Environment.IsDevelopment() && app.Configuration.GetValue("SeedDemoData", false))
+{
+    await DemoDataSeeder.SeedAsync(app.Services);
 }
 
 // Configure the HTTP request pipeline.
