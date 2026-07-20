@@ -11,6 +11,7 @@ namespace WebsiteBuilder.Web.Middleware;
 public sealed class TenantResolutionMiddleware(RequestDelegate next, IOptions<TenantResolutionOptions> options)
 {
     public const string SiteNotFoundPath = "/site-not-found";
+    public const string SitePath = "/site";
 
     private readonly TenantResolutionOptions _options = options.Value;
 
@@ -43,6 +44,20 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next, IOptions<Te
                 }
 
                 tenantContext.TenantId = tenantId;
+
+                // A tenant host serves one thing: that tenant's published site. Requests for
+                // files (images, css) fall through to static assets; anything else would
+                // otherwise reach builder pages on a customer's domain.
+                if (context.Request.Path == "/")
+                {
+                    context.Request.Path = SitePath;
+                }
+                else if (!Path.HasExtension(context.Request.Path.Value))
+                {
+                    await RenderSiteNotFoundAsync(context);
+                    return;
+                }
+
                 await next(context);
                 return;
 

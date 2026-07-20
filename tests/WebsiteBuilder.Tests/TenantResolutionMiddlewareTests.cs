@@ -5,6 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using WebsiteBuilder.Core.Entities;
+using WebsiteBuilder.Core.SiteModel;
 using WebsiteBuilder.Core.Tenancy;
 using WebsiteBuilder.Data;
 
@@ -38,14 +39,29 @@ public class TenantResolutionMiddlewareTests(PostgresFixture fixture) : IDisposa
         AllowAutoRedirect = false,
     });
 
-    private async Task<string> SeedTenantAsync()
+    /// <summary>Seeds a tenant, with a published site unless the caller opts out.</summary>
+    private async Task<string> SeedTenantAsync(bool withPublishedSite = false)
     {
         var subdomain = $"t{Guid.NewGuid():N}"[..12];
 
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<WebsiteBuilderDbContext>();
-        db.Tenants.Add(new Tenant { Subdomain = subdomain, Name = "Seeded Tenant" });
+        var tenant = new Tenant { Subdomain = subdomain, Name = "Seeded Tenant" };
+        db.Tenants.Add(tenant);
         await db.SaveChangesAsync();
+
+        if (withPublishedSite)
+        {
+            scope.ServiceProvider.GetRequiredService<TenantContext>().TenantId = tenant.Id;
+            var site = new Site
+            {
+                Name = "Seeded Site",
+                Draft = new SiteDefinition { Sections = [new HeroSection { Headline = "Seeded headline" }] },
+            };
+            site.Publish();
+            db.Sites.Add(site);
+            await db.SaveChangesAsync();
+        }
 
         return subdomain;
     }
@@ -53,12 +69,24 @@ public class TenantResolutionMiddlewareTests(PostgresFixture fixture) : IDisposa
     [Fact]
     public async Task A_known_subdomain_resolves_and_serves_the_site()
     {
-        var subdomain = await SeedTenantAsync();
+        var subdomain = await SeedTenantAsync(withPublishedSite: true);
         var client = CreateClient();
 
         var response = await client.GetAsync($"http://{subdomain}.platform.com/");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("Seeded headline", await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task A_known_subdomain_with_nothing_published_gets_the_not_found_page()
+    {
+        var subdomain = await SeedTenantAsync();
+        var client = CreateClient();
+
+        var response = await client.GetAsync($"http://{subdomain}.platform.com/");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]

@@ -1,8 +1,12 @@
+using System.Text.Encodings.Web;
+using System.Text.Unicode;
 using Microsoft.EntityFrameworkCore;
 using WebsiteBuilder.Core.Tenancy;
 using WebsiteBuilder.Data;
+using WebsiteBuilder.Web.Caching;
 using WebsiteBuilder.Web.Components;
 using WebsiteBuilder.Web.Middleware;
+using WebsiteBuilder.Web.Publishing;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -31,6 +35,14 @@ if (string.IsNullOrWhiteSpace(connectionString))
 builder.Services.AddWebsiteBuilderData(connectionString);
 builder.Services.Configure<TenantResolutionOptions>(
     builder.Configuration.GetSection(TenantResolutionOptions.SectionName));
+builder.Services.AddScoped<SitePublisher>();
+
+// Emit non-ASCII text as UTF-8 rather than numeric entities. Business names and copy are often
+// accented or non-Latin, and escaping every such character inflates the page for no benefit.
+builder.Services.AddWebEncoders(options =>
+    options.TextEncoderSettings = new TextEncoderSettings(UnicodeRanges.All));
+builder.Services.AddOutputCache(options =>
+    options.AddPolicy(TenantSiteCachePolicy.Name, new TenantSiteCachePolicy()));
 
 var app = builder.Build();
 
@@ -55,6 +67,9 @@ app.UseHttpsRedirection();
 // selected before tenant resolution ran, and its not-found rewrite would be ignored.
 app.UseMiddleware<TenantResolutionMiddleware>();
 app.UseRouting();
+
+// After tenant resolution so the cache key can include the tenant.
+app.UseOutputCache();
 
 app.UseAntiforgery();
 
