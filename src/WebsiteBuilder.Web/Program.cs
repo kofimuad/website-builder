@@ -12,10 +12,22 @@ builder.Services.AddRazorComponents()
 builder.Services.AddRazorPages();
 builder.Services.AddHealthChecks();
 
-var connectionString = builder.Configuration.GetConnectionString("Default")
-    ?? Environment.GetEnvironmentVariable("DATABASE_URL")
-    ?? throw new InvalidOperationException(
-        "No database connection string. Set ConnectionStrings:Default or DATABASE_URL.");
+// Blank is treated as missing, not as a value: a Railway reference variable whose target does
+// not exist resolves to an empty string, and passing that on fails far from the real cause.
+var connectionString = builder.Configuration.GetConnectionString("Default");
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    connectionString = builder.Configuration["DATABASE_URL"];
+}
+
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    throw new InvalidOperationException(
+        "No database connection string. Set ConnectionStrings:Default or DATABASE_URL. " +
+        "If DATABASE_URL is set but empty, a variable reference such as ${{Postgres.DATABASE_URL}} " +
+        "did not resolve — check that the referenced service name matches exactly.");
+}
+
 builder.Services.AddWebsiteBuilderData(connectionString);
 builder.Services.Configure<TenantResolutionOptions>(
     builder.Configuration.GetSection(TenantResolutionOptions.SectionName));
