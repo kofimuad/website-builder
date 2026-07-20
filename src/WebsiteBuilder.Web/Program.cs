@@ -1,12 +1,14 @@
 using System.Text.Encodings.Web;
 using System.Text.Unicode;
 using Microsoft.EntityFrameworkCore;
+using WebsiteBuilder.Core.Generation;
 using WebsiteBuilder.Core.Tenancy;
 using WebsiteBuilder.Data;
 using WebsiteBuilder.Web.Caching;
 using WebsiteBuilder.Web.Components;
 using WebsiteBuilder.Web.Development;
 using WebsiteBuilder.Web.Middleware;
+using WebsiteBuilder.Web.Onboarding;
 using WebsiteBuilder.Web.Publishing;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -37,6 +39,10 @@ builder.Services.AddWebsiteBuilderData(connectionString);
 builder.Services.Configure<TenantResolutionOptions>(
     builder.Configuration.GetSection(TenantResolutionOptions.SectionName));
 builder.Services.AddScoped<SitePublisher>();
+builder.Services.AddScoped<OnboardingService>();
+
+// Deterministic generation for now; the Claude-backed generator replaces this in WB-3.
+builder.Services.AddSingleton<ISiteGenerator, TemplateSiteGenerator>();
 
 // Emit non-ASCII text as UTF-8 rather than numeric entities. Business names and copy are often
 // accented or non-Latin, and escaping every such character inflates the page for no benefit.

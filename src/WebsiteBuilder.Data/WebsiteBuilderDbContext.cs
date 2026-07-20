@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using WebsiteBuilder.Core.Entities;
+using WebsiteBuilder.Core.Onboarding;
 using WebsiteBuilder.Core.SiteModel;
 using WebsiteBuilder.Core.Tenancy;
 
@@ -19,6 +20,7 @@ public class WebsiteBuilderDbContext : DbContext
 
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<Site> Sites => Set<Site>();
+    public DbSet<BusinessProfile> BusinessProfiles => Set<BusinessProfile>();
 
     private static readonly ValueConverter<SiteDefinition, string> DefinitionConverter = new(
         definition => SiteDefinitionSerializer.Serialize(definition),
@@ -70,10 +72,25 @@ public class WebsiteBuilderDbContext : DbContext
                 .HasConversion(NullableDefinitionConverter, NullableDefinitionComparer);
         });
 
+        modelBuilder.Entity<BusinessProfile>(e =>
+        {
+            e.HasKey(p => p.Id);
+            e.Property(p => p.BusinessName).HasMaxLength(200).IsRequired();
+            e.Property(p => p.Category).HasMaxLength(200).IsRequired();
+            e.Property(p => p.Tone).HasConversion<string>().HasMaxLength(32);
+            e.Property(p => p.PrimaryAction).HasConversion<string>().HasMaxLength(32);
+            // One profile per tenant: onboarding fills it, WB-18 edits the same row.
+            e.HasIndex(p => p.TenantId).IsUnique();
+            e.HasOne<Tenant>().WithMany().HasForeignKey(p => p.TenantId).OnDelete(DeleteBehavior.Cascade);
+        });
+
         // Tenant-owned entities are filtered on every query. A null TenantId matches nothing
         // rather than everything, so a missing tenant scope fails closed.
         modelBuilder.Entity<Site>()
             .HasQueryFilter(s => _tenantContext.TenantId != null && s.TenantId == _tenantContext.TenantId);
+
+        modelBuilder.Entity<BusinessProfile>()
+            .HasQueryFilter(p => _tenantContext.TenantId != null && p.TenantId == _tenantContext.TenantId);
 
         base.OnModelCreating(modelBuilder);
     }

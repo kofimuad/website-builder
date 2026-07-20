@@ -1,0 +1,176 @@
+/* Mobile first: the interview is expected to be taken on a phone. */
+.interview {
+    min-height: 100vh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 1.25rem;
+    background: #f5f6f8;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    color: #16161a;
+}
+
+.card {
+    width: 100%;
+    max-width: 34rem;
+    background: #fff;
+    border-radius: 1rem;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px rgb(0 0 0 / 8%);
+}
+
+h1 {
+    font-size: 1.5rem;
+    line-height: 1.25;
+    margin: 0 0 .5rem;
+}
+
+.hint {
+    color: #5c5c66;
+    margin: 0 0 1.25rem;
+}
+
+.hint.spaced { margin-top: 1.5rem; }
+
+.note {
+    background: #f1f7f4;
+    border-radius: .5rem;
+    padding: .875rem;
+    color: #3f5f52;
+    margin: 0 0 1rem;
+}
+
+.progress-label {
+    font-size: .875rem;
+    color: #5c5c66;
+    margin: 0 0 .5rem;
+}
+
+.progress {
+    height: .375rem;
+    background: #eceef2;
+    border-radius: 999px;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+}
+
+.progress span {
+    display: block;
+    height: 100%;
+    background: #0a7d55;
+    transition: width .2s ease;
+}
+
+label {
+    display: block;
+    margin-bottom: 1rem;
+    color: #5c5c66;
+    font-size: .9375rem;
+}
+
+input, textarea {
+    display: block;
+    width: 100%;
+    margin-top: .375rem;
+    padding: .875rem;
+    font: inherit;
+    color: #16161a;
+    border: 1px solid #d5d8de;
+    border-radius: .5rem;
+    background: #fff;
+}
+
+input:focus, textarea:focus {
+    outline: 2px solid #0a7d55;
+    outline-offset: 1px;
+    border-color: transparent;
+}
+
+textarea { resize: vertical; }
+
+.choices {
+    display: grid;
+    gap: .625rem;
+    margin-bottom: .5rem;
+}
+
+.choice {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: .875rem 1rem;
+    border: 1px solid #d5d8de;
+    border-radius: .625rem;
+    background: #fff;
+    font: inherit;
+    cursor: pointer;
+}
+
+.choice strong { display: block; }
+
+.choice span {
+    display: block;
+    color: #5c5c66;
+    font-size: .875rem;
+    margin-top: .125rem;
+}
+
+.choice.selected {
+    border-color: #0a7d55;
+    background: #f1f7f4;
+}
+
+.problem {
+    color: #b3261e;
+    background: #fdecea;
+    border-radius: .5rem;
+    padding: .75rem .875rem;
+    margin: 0 0 1rem;
+}
+
+.actions {
+    display: flex;
+    gap: .75rem;
+    margin-top: 1.5rem;
+}
+
+button.primary, a.primary {
+    flex: 1;
+    padding: .875rem 1.25rem;
+    border: 0;
+    border-radius: .5rem;
+    background: #0a7d55;
+    color: #fff;
+    font: inherit;
+    font-weight: 600;
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+button.primary:disabled { opacity: .6; cursor: default; }
+
+button.secondary {
+    padding: .875rem 1.25rem;
+    border: 1px solid #d5d8de;
+    border-radius: .5rem;
+    background: #fff;
+    font: inherit;
+    cursor: pointer;
+}
+
+.done .address {
+    font-weight: 600;
+    background: #f5f6f8;
+    border-radius: .5rem;
+    padding: .75rem;
+    word-break: break-all;
+}
+
+.done .address span { color: #5c5c66; }
+
+@media (min-width: 40rem) {
+    .interview { align-items: center; padding: 2rem; }
+    .card { padding: 2rem; }
+    h1 { font-size: 1.75rem; }
+}

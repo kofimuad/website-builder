@@ -1,0 +1,215 @@
+@page "/start"
+@using WebsiteBuilder.Core.Onboarding
+@using WebsiteBuilder.Web.Onboarding
+@rendermode InteractiveServer
+@inject OnboardingService OnboardingService
+@inject NavigationManager Navigation
+
+<PageTitle>Let's build your website</PageTitle>
+
+<div class="interview">
+    @if (_result is not null)
+    {
+        <div class="card done">
+            <h1>Your website is ready to look at</h1>
+            <p>We've put together a first draft from your answers. Nothing is public yet.</p>
+            <p class="address">@_result.Subdomain.<span>@PlatformSuffix</span></p>
+            <a class="primary" href="@PreviewUrl">See my website</a>
+        </div>
+    }
+    else
+    {
+        <div class="card">
+            <p class="progress-label">Question @_wizard.StepNumber of @_wizard.StepCount</p>
+            <div class="progress" role="progressbar" aria-valuenow="@_wizard.StepNumber" aria-valuemin="1" aria-valuemax="@_wizard.StepCount">
+                <span style="width:@(_wizard.StepNumber * 100 / _wizard.StepCount)%"></span>
+            </div>
+
+            @switch (_wizard.CurrentStep)
+            {
+                case OnboardingStep.BusinessName:
+                    <h1>What's your business called?</h1>
+                    <p class="hint">This goes at the top of your website.</p>
+                    <input @bind="_wizard.Answers.BusinessName" @bind:event="oninput" autofocus
+                           placeholder="Joe's Plumbing" />
+                    break;
+
+                case OnboardingStep.Category:
+                    <h1>What kind of business is it?</h1>
+                    <p class="hint">In your own words &mdash; plumber, hair salon, bakery.</p>
+                    <input @bind="_wizard.Answers.Category" @bind:event="oninput" placeholder="Plumber" />
+                    break;
+
+                case OnboardingStep.Offerings:
+                    <h1>What do you offer?</h1>
+                    <p class="hint">One per line. Three or four is plenty.</p>
+                    <textarea rows="5" @bind="_offeringsText" @bind:event="oninput"
+                              placeholder="Drain clearing&#10;Leak repair&#10;Bathroom fitting"></textarea>
+                    break;
+
+                case OnboardingStep.Tone:
+                    <h1>How should your website sound?</h1>
+                    <p class="hint">You can change this later.</p>
+                    <div class="choices">
+                        @foreach (var tone in Enum.GetValues<BusinessTone>())
+                        {
+                            <button type="button" class="choice @(_wizard.Answers.Tone == tone ? "selected" : "")"
+                                    @onclick="() => _wizard.Answers.Tone = tone">
+                                <strong>@ToneLabel(tone)</strong>
+                                <span>@ToneHint(tone)</span>
+                            </button>
+                        }
+                    </div>
+                    break;
+
+                case OnboardingStep.Photos:
+                    <h1>Got photos of your work?</h1>
+                    <p class="hint">You can add these later &mdash; your website will look good without them.</p>
+                    <p class="note">Photo uploads are coming soon. Skip for now and we'll build your site without them.</p>
+                    break;
+
+                case OnboardingStep.Contact:
+                    <h1>How should customers reach you?</h1>
+                    <p class="hint">Fill in whichever you use. At least one, please.</p>
+                    <label>Phone<input @bind="_wizard.Answers.PhoneNumber" @bind:event="oninput" placeholder="+233 20 000 0000" /></label>
+                    <label>WhatsApp<input @bind="_wizard.Answers.WhatsAppNumber" @bind:event="oninput" placeholder="+233 20 000 0000" /></label>
+                    <label>Email<input @bind="_wizard.Answers.Email" @bind:event="oninput" placeholder="you@example.com" /></label>
+
+                    <p class="hint spaced">What should customers do first?</p>
+                    <div class="choices">
+                        @foreach (var action in Enum.GetValues<PrimaryAction>())
+                        {
+                            <button type="button" class="choice @(_wizard.Answers.PrimaryAction == action ? "selected" : "")"
+                                    @onclick="() => _wizard.Answers.PrimaryAction = action">
+                                <strong>@ActionLabel(action)</strong>
+                            </button>
+                        }
+                    </div>
+                    break;
+
+                case OnboardingStep.ServiceArea:
+                    <h1>Where do you work?</h1>
+                    <p class="hint">The area you cover, and your address if customers visit you.</p>
+                    <label>Area you cover<input @bind="_wizard.Answers.ServiceArea" @bind:event="oninput" placeholder="Osu and East Legon" /></label>
+                    <label>Address (optional)<textarea rows="3" @bind="_addressText" @bind:event="oninput"
+                                                       placeholder="12 High Street&#10;Osu, Accra"></textarea></label>
+                    break;
+            }
+
+            @if (_problem is not null)
+            {
+                <p class="problem" role="alert">@_problem</p>
+            }
+
+            <div class="actions">
+                @if (!_wizard.IsFirstStep)
+                {
+                    <button type="button" class="secondary" @onclick="Back" disabled="@_working">Back</button>
+                }
+                <button type="button" class="primary" @onclick="Next" disabled="@_working">
+                    @(_working ? "Building your website…" : NextLabel)
+                </button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private readonly OnboardingWizard _wizard = new();
+    private string _offeringsText = "";
+    private string _addressText = "";
+    private string? _problem;
+    private bool _working;
+    private OnboardingResult? _result;
+
+    [Inject] private Microsoft.Extensions.Options.IOptions<Core.Tenancy.TenantResolutionOptions> TenantOptions { get; set; } = default!;
+
+    private string PlatformSuffix => TenantOptions.Value.PlatformDomain;
+
+    private string PreviewUrl
+    {
+        get
+        {
+            var current = new Uri(Navigation.BaseUri);
+            var port = current.IsDefaultPort ? "" : $":{current.Port}";
+            return $"{current.Scheme}://{_result!.Subdomain}.{PlatformSuffix}{port}/";
+        }
+    }
+
+    private string NextLabel => _wizard.CurrentStep == OnboardingStep.ServiceArea
+        ? "Build my website"
+        : OnboardingWizard.IsOptional(_wizard.CurrentStep) ? "Skip" : "Next";
+
+    private async Task Next()
+    {
+        CaptureTextAreas();
+
+        _problem = _wizard.TryAdvance();
+        if (_problem is not null || !_wizard.IsComplete)
+        {
+            return;
+        }
+
+        _working = true;
+        try
+        {
+            _result = await OnboardingService.CompleteAsync(_wizard.Answers);
+        }
+        catch (Exception)
+        {
+            // Never show a stack trace to someone who just wanted a website.
+            _problem = "Something went wrong building your website. Please try again.";
+            _wizard.GoBack();
+        }
+        finally
+        {
+            _working = false;
+        }
+    }
+
+    private void Back()
+    {
+        CaptureTextAreas();
+        _problem = null;
+        _wizard.GoBack();
+    }
+
+    /// <summary>The multi-line answers are edited as text and kept as lists.</summary>
+    private void CaptureTextAreas()
+    {
+        if (_wizard.CurrentStep == OnboardingStep.Offerings)
+        {
+            _wizard.Answers.Offerings = SplitLines(_offeringsText);
+        }
+
+        if (_wizard.CurrentStep == OnboardingStep.ServiceArea)
+        {
+            _wizard.Answers.AddressLines = SplitLines(_addressText);
+        }
+    }
+
+    private static List<string> SplitLines(string value) =>
+        value.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+
+    private static string ToneLabel(BusinessTone tone) => tone switch
+    {
+        BusinessTone.Professional => "Calm and professional",
+        BusinessTone.Bold => "Bold and direct",
+        _ => "Warm and friendly",
+    };
+
+    private static string ToneHint(BusinessTone tone) => tone switch
+    {
+        BusinessTone.Professional => "Steady, reassuring, understated",
+        BusinessTone.Bold => "Confident, short sentences, strong colours",
+        _ => "Approachable, like talking to a neighbour",
+    };
+
+    private static string ActionLabel(PrimaryAction action) => action switch
+    {
+        PrimaryAction.Visit => "Visit us",
+        PrimaryAction.Book => "Book an appointment",
+        PrimaryAction.Message => "Message us",
+        _ => "Call us",
+    };
+}
