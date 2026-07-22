@@ -43,8 +43,104 @@
 .tip { color: #5c5c66; font-size: .9375rem; margin: 0 0 1.5rem; }
 
 .block {
+    position: relative;
     padding: 1.25rem 0;
     border-bottom: 1px solid #ececf0;
+}
+
+.block-tools {
+    position: absolute;
+    top: .5rem;
+    right: 0;
+    display: flex;
+    gap: .25rem;
+    opacity: 0;
+    transition: opacity .12s;
+}
+
+.block:hover .block-tools, .block:focus-within .block-tools { opacity: 1; }
+
+.block-tools button {
+    width: 1.9rem;
+    height: 1.9rem;
+    border: 1px solid #d5d8de;
+    border-radius: .375rem;
+    background: #fff;
+    color: #16161a;
+    font-size: .9rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.block-tools button:disabled { opacity: .4; cursor: default; }
+.block-tools button.danger { color: #b3261e; border-color: #f0c9c5; }
+
+.undo {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    background: #16161a;
+    color: #f2f2f5;
+    border-radius: .5rem;
+    padding: .625rem .875rem;
+    margin-bottom: 1rem;
+    font-size: .9rem;
+}
+
+.undo button {
+    border: 0;
+    background: transparent;
+    color: #7fd6ad;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.add { padding: 1.5rem 0; }
+
+.add-btn {
+    width: 100%;
+    padding: .875rem;
+    border: 2px dashed #d5d8de;
+    border-radius: .625rem;
+    background: transparent;
+    color: #5c5c66;
+    font: inherit;
+    cursor: pointer;
+}
+
+.add-btn:hover { border-color: #0a7d55; color: #0a7d55; }
+
+.picker { border: 1px solid #e0e2e8; border-radius: .75rem; padding: 1rem; }
+
+.picker-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: .75rem;
+    font-weight: 600;
+}
+
+.picker-head button { border: 0; background: transparent; font: inherit; color: #5c5c66; cursor: pointer; }
+
+.picker-grid { display: grid; gap: .625rem; grid-template-columns: 1fr; }
+
+.picker-item {
+    text-align: left;
+    padding: .75rem;
+    border: 1px solid #e0e2e8;
+    border-radius: .5rem;
+    background: #fff;
+    font: inherit;
+    cursor: pointer;
+}
+
+.picker-item:hover { border-color: #0a7d55; background: #f1f7f4; }
+.picker-item strong { display: block; }
+.picker-item span { color: #5c5c66; font-size: .875rem; }
+
+@media (min-width: 34rem) {
+    .picker-grid { grid-template-columns: 1fr 1fr; }
 }
 
 .item {

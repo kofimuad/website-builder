@@ -49,9 +49,25 @@ else
 
     <div class="canvas">
         <p class="tip">Click any text to edit it. Your changes save on their own.</p>
-        @foreach (var section in _site.Draft.Sections)
+
+        @if (_undo is not null)
         {
+            <div class="undo" role="status">
+                <span>Section removed.</span>
+                <button type="button" @onclick="UndoDelete">Undo</button>
+            </div>
+        }
+
+        @for (var i = 0; i < _site.Draft.Sections.Count; i++)
+        {
+            var index = i;
+            var section = _site.Draft.Sections[index];
             <section class="block">
+                <div class="block-tools">
+                    <button type="button" title="Move up" disabled="@(index == 0)" @onclick="() => Move(index, -1)">↑</button>
+                    <button type="button" title="Move down" disabled="@(index == _site.Draft.Sections.Count - 1)" @onclick="() => Move(index, 1)">↓</button>
+                    <button type="button" class="danger" title="Remove" @onclick="() => Delete(index)">✕</button>
+                </div>
                 @switch (section)
                 {
                     case HeroSection hero:
@@ -110,6 +126,31 @@ else
                 }
             </section>
         }
+
+        <div class="add">
+            @if (_showPicker)
+            {
+                <div class="picker">
+                    <div class="picker-head">
+                        <span>Add a section</span>
+                        <button type="button" @onclick="() => _showPicker = false">Close</button>
+                    </div>
+                    <div class="picker-grid">
+                        @foreach (var entry in SectionCatalog.Entries)
+                        {
+                            <button type="button" class="picker-item" @onclick="() => AddSection(entry)">
+                                <strong>@entry.Label</strong>
+                                <span>@entry.Description</span>
+                            </button>
+                        }
+                    </div>
+                </div>
+            }
+            else
+            {
+                <button type="button" class="add-btn" @onclick="() => _showPicker = true">+ Add a section</button>
+            }
+        </div>
     </div>
 }
 
@@ -124,6 +165,8 @@ else
     private bool _showPreview;
     private bool _phoneWidth;
     private int _previewNonce;
+    private bool _showPicker;
+    private (int Index, SiteSection Section)? _undo;
     private CancellationTokenSource? _debounce;
 
     protected override async Task OnInitializedAsync()
@@ -138,7 +181,49 @@ else
         _site = managed.Site;
     }
 
-    /// <summary>Every keystroke marks the draft dirty and (re)arms a short debounce before saving.</summary>
+    private void Move(int index, int delta)
+    {
+        var sections = _site!.Draft.Sections;
+        var target = index + delta;
+        if (target < 0 || target >= sections.Count)
+        {
+            return;
+        }
+
+        (sections[index], sections[target]) = (sections[target], sections[index]);
+        MarkDirty();
+    }
+
+    private void Delete(int index)
+    {
+        var section = _site!.Draft.Sections[index];
+        _site.Draft.Sections.RemoveAt(index);
+        _undo = (index, section);
+        MarkDirty();
+    }
+
+    private void UndoDelete()
+    {
+        if (_undo is not { } removed)
+        {
+            return;
+        }
+
+        var at = Math.Min(removed.Index, _site!.Draft.Sections.Count);
+        _site.Draft.Sections.Insert(at, removed.Section);
+        _undo = null;
+        MarkDirty();
+    }
+
+    private void AddSection(SectionCatalogEntry entry)
+    {
+        _site!.Draft.Sections.Add(entry.Create());
+        _showPicker = false;
+        _undo = null;
+        MarkDirty();
+    }
+
+    /// <summary>Every keystroke or structural change marks the draft dirty and (re)arms a short debounce.</summary>
     private void MarkDirty()
     {
         _dirty = true;
