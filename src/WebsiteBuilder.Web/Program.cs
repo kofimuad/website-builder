@@ -66,7 +66,14 @@ else
         primary: sp.GetRequiredService<ClaudeSiteGenerator>(),
         fallback: sp.GetRequiredService<TemplateSiteGenerator>(),
         logger: sp.GetRequiredService<ILogger<FallbackSiteGenerator>>()));
+
+    // The per-section assistant needs the model, so it exists only when the key does.
+    builder.Services.AddSingleton<ISectionAssistant, ClaudeSectionAssistant>();
 }
+
+// Usage gate for the assistant; harmless when the assistant isn't available.
+builder.Services.Configure<AssistantOptions>(builder.Configuration.GetSection(AssistantOptions.SectionName));
+builder.Services.AddSingleton<IAssistantRateLimiter, InMemoryAssistantRateLimiter>();
 
 // Emit non-ASCII text as UTF-8 rather than numeric entities. Business names and copy are often
 // accented or non-Latin, and escaping every such character inflates the page for no benefit.

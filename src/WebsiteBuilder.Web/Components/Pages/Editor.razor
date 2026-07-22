@@ -1,9 +1,12 @@
 @page "/manage/{SiteId:guid}/edit"
+@using WebsiteBuilder.Core.Generation
 @using WebsiteBuilder.Core.SiteModel
 @using WebsiteBuilder.Web.Management
 @rendermode InteractiveServer
 @implements IDisposable
 @inject SiteManagementService Management
+@inject IServiceProvider Services
+@inject IAssistantRateLimiter RateLimiter
 
 <PageTitle>Edit your website</PageTitle>
 
@@ -50,11 +53,11 @@ else
     <div class="canvas">
         <p class="tip">Click any text to edit it. Your changes save on their own.</p>
 
-        @if (_undo is not null)
+        @if (_undoLabel is not null)
         {
             <div class="undo" role="status">
-                <span>Section removed.</span>
-                <button type="button" @onclick="UndoDelete">Undo</button>
+                <span>@_undoLabel</span>
+                <button type="button" @onclick="Undo">Undo</button>
             </div>
         }
 
@@ -64,6 +67,10 @@ else
             var section = _site.Draft.Sections[index];
             <section class="block">
                 <div class="block-tools">
+                    @if (_assistant is not null)
+                    {
+                        <button type="button" class="ai" title="Ask AI" @onclick="() => OpenAi(index)">✨</button>
+                    }
                     <button type="button" title="Move up" disabled="@(index == 0)" @onclick="() => Move(index, -1)">↑</button>
                     <button type="button" title="Move down" disabled="@(index == _site.Draft.Sections.Count - 1)" @onclick="() => Move(index, 1)">↓</button>
                     <button type="button" class="danger" title="Remove" @onclick="() => Delete(index)">✕</button>
@@ -124,6 +131,24 @@ else
                         <input class="edit button" @bind="cta.ButtonLabel" @bind:event="oninput" @bind:after="MarkDirty" placeholder="Button text" />
                         break;
                 }
+
+                @if (_aiIndex == index)
+                {
+                    <div class="ai-panel">
+                        <input class="ai-input" @bind="_aiText" @bind:event="oninput"
+                               placeholder="Tell the assistant what to change — e.g. &quot;make this friendlier&quot;" disabled="@_aiBusy" />
+                        <div class="ai-actions">
+                            <button type="button" @onclick="() => CloseAi()" disabled="@_aiBusy">Cancel</button>
+                            <button type="button" class="go" @onclick="() => RunAi(index)" disabled="@_aiBusy">
+                                @(_aiBusy ? "Working…" : "Update")
+                            </button>
+                        </div>
+                        @if (_aiError is not null)
+                        {
+                            <p class="ai-error" role="alert">@_aiError</p>
+                        }
+                    </div>
+                }
             </section>
         }
 
@@ -166,11 +191,20 @@ else
     private bool _phoneWidth;
     private int _previewNonce;
     private bool _showPicker;
-    private (int Index, SiteSection Section)? _undo;
+    private string? _undoLabel;
+    private Action? _undoAction;
     private CancellationTokenSource? _debounce;
+
+    private ISectionAssistant? _assistant;
+    private int? _aiIndex;
+    private string _aiText = "";
+    private string? _aiError;
+    private bool _aiBusy;
 
     protected override async Task OnInitializedAsync()
     {
+        _assistant = Services.GetService<ISectionAssistant>();
+
         var managed = await Management.LoadAsync(SiteId);
         if (managed is null)
         {
@@ -179,6 +213,56 @@ else
         }
 
         _site = managed.Site;
+    }
+
+    private void OpenAi(int index)
+    {
+        _aiIndex = index;
+        _aiText = "";
+        _aiError = null;
+    }
+
+    private void CloseAi()
+    {
+        _aiIndex = null;
+        _aiError = null;
+    }
+
+    private async Task RunAi(int index)
+    {
+        if (_assistant is null || string.IsNullOrWhiteSpace(_aiText))
+        {
+            return;
+        }
+
+        if (!RateLimiter.TryAcquire(_site!.TenantId))
+        {
+            _aiError = "You've reached today's AI edits. Try again tomorrow.";
+            return;
+        }
+
+        _aiBusy = true;
+        _aiError = null;
+        try
+        {
+            var original = _site.Draft.Sections[index];
+            var revised = await _assistant.ReviseAsync(original, _aiText);
+            _site.Draft.Sections[index] = revised;
+
+            _undoLabel = "The assistant updated this section.";
+            _undoAction = () => _site.Draft.Sections[index] = original;
+            _aiIndex = null;
+            _aiText = "";
+            MarkDirty();
+        }
+        catch (Exception)
+        {
+            _aiError = "The assistant couldn't make that change. Please try rewording it.";
+        }
+        finally
+        {
+            _aiBusy = false;
+        }
     }
 
     private void Move(int index, int delta)
@@ -196,22 +280,20 @@ else
 
     private void Delete(int index)
     {
-        var section = _site!.Draft.Sections[index];
-        _site.Draft.Sections.RemoveAt(index);
-        _undo = (index, section);
+        var sections = _site!.Draft.Sections;
+        var section = sections[index];
+        sections.RemoveAt(index);
+
+        _undoLabel = "Section removed.";
+        _undoAction = () => sections.Insert(Math.Min(index, sections.Count), section);
         MarkDirty();
     }
 
-    private void UndoDelete()
+    private void Undo()
     {
-        if (_undo is not { } removed)
-        {
-            return;
-        }
-
-        var at = Math.Min(removed.Index, _site!.Draft.Sections.Count);
-        _site.Draft.Sections.Insert(at, removed.Section);
-        _undo = null;
+        _undoAction?.Invoke();
+        _undoAction = null;
+        _undoLabel = null;
         MarkDirty();
     }
 
@@ -219,7 +301,8 @@ else
     {
         _site!.Draft.Sections.Add(entry.Create());
         _showPicker = false;
-        _undo = null;
+        _undoLabel = null;
+        _undoAction = null;
         MarkDirty();
     }
 

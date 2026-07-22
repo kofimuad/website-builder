@@ -74,6 +74,40 @@
 
 .block-tools button:disabled { opacity: .4; cursor: default; }
 .block-tools button.danger { color: #b3261e; border-color: #f0c9c5; }
+.block-tools button.ai { color: #7a5cff; border-color: #d9d1ff; }
+
+.ai-panel {
+    margin-top: .875rem;
+    padding: .875rem;
+    background: #f6f4ff;
+    border: 1px solid #e2dcff;
+    border-radius: .625rem;
+}
+
+.ai-input {
+    width: 100%;
+    padding: .625rem .75rem;
+    border: 1px solid #d5d8de;
+    border-radius: .5rem;
+    font: inherit;
+    background: #fff;
+}
+
+.ai-actions { display: flex; gap: .5rem; justify-content: flex-end; margin-top: .625rem; }
+
+.ai-actions button {
+    padding: .5rem .875rem;
+    border: 1px solid #d5d8de;
+    border-radius: .5rem;
+    background: #fff;
+    font: inherit;
+    cursor: pointer;
+}
+
+.ai-actions button.go { background: #7a5cff; border-color: #7a5cff; color: #fff; font-weight: 600; }
+.ai-actions button:disabled { opacity: .6; cursor: default; }
+
+.ai-error { color: #b3261e; font-size: .875rem; margin: .625rem 0 0; }
 
 .undo {
     display: flex;
