@@ -23,11 +23,36 @@ else
     <div class="bar">
         <span class="status @(_dirty ? "busy" : "")">@_status</span>
         <div class="bar-actions">
+            <button type="button" class="btn" @onclick="() => _showThemes = !_showThemes">Look</button>
+            <button type="button" class="btn" @onclick="TryAnotherLook">Try another look</button>
             <button type="button" class="btn" @onclick="OpenPreview">Preview</button>
             <a class="btn" href="/manage/@SiteId/profile">Business details</a>
             <button type="button" class="btn primary" @onclick="Publish" disabled="@_publishing">Publish</button>
         </div>
     </div>
+
+    @if (_showThemes)
+    {
+        <div class="themes">
+            <div class="themes-head">
+                <span>Choose a look — your words stay the same</span>
+                <button type="button" @onclick="() => _showThemes = false">Close</button>
+            </div>
+            <div class="themes-grid">
+                @foreach (var preset in ThemePresetCatalog.Presets)
+                {
+                    <button type="button" class="swatch @(IsCurrent(preset) ? "on" : "")" @onclick="() => ApplyTheme(preset)">
+                        <span class="chips">
+                            <i style="background:@preset.Theme.Palette.Primary"></i>
+                            <i style="background:@preset.Theme.Palette.Accent"></i>
+                            <i style="background:@preset.Theme.Palette.Surface"></i>
+                        </span>
+                        <span class="swatch-label">@preset.Label</span>
+                    </button>
+                }
+            </div>
+        </div>
+    }
 
     @if (_showPreview)
     {
@@ -191,6 +216,7 @@ else
     private bool _phoneWidth;
     private int _previewNonce;
     private bool _showPicker;
+    private bool _showThemes;
     private string? _undoLabel;
     private Action? _undoAction;
     private CancellationTokenSource? _debounce;
@@ -304,6 +330,36 @@ else
         _undoLabel = null;
         _undoAction = null;
         MarkDirty();
+    }
+
+    private bool IsCurrent(ThemePreset preset) =>
+        _site is not null && string.Equals(_site.Draft.Theme.Palette.Primary, preset.Theme.Palette.Primary, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Applies a curated look. Only the theme changes — every word of copy is preserved.</summary>
+    private void ApplyTheme(ThemePreset preset)
+    {
+        var previous = _site!.Draft.Theme;
+        _site.Draft.Theme = preset.Theme.Clone();
+
+        _undoLabel = $"Look changed to {preset.Label}.";
+        _undoAction = () => _site.Draft.Theme = previous;
+        _showThemes = false;
+        MarkDirty();
+    }
+
+    private void TryAnotherLook()
+    {
+        var current = _site!.Draft.Theme.Palette.Primary;
+        var others = ThemePresetCatalog.Presets
+            .Where(p => !string.Equals(p.Theme.Palette.Primary, current, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (others.Count == 0)
+        {
+            return;
+        }
+
+        ApplyTheme(others[Random.Shared.Next(others.Count)]);
     }
 
     /// <summary>Every keystroke or structural change marks the draft dirty and (re)arms a short debounce.</summary>

@@ -32,6 +32,60 @@
 .btn.primary { background: #0a7d55; border-color: #0a7d55; font-weight: 600; }
 .btn:disabled { opacity: .6; cursor: default; }
 
+.themes {
+    background: #1f1f25;
+    color: #f2f2f5;
+    padding: 1rem 1.25rem 1.25rem;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.themes-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: .75rem;
+    font-size: .9rem;
+    color: #c9c9d2;
+}
+
+.themes-head button { border: 0; background: transparent; color: #c9c9d2; font: inherit; cursor: pointer; }
+
+.themes-grid {
+    display: grid;
+    gap: .625rem;
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.swatch {
+    display: flex;
+    align-items: center;
+    gap: .625rem;
+    padding: .5rem .625rem;
+    border: 1px solid #3a3a42;
+    border-radius: .5rem;
+    background: #2a2a30;
+    color: #f2f2f5;
+    font: inherit;
+    font-size: .875rem;
+    cursor: pointer;
+}
+
+.swatch.on { border-color: #7fd6ad; box-shadow: 0 0 0 2px #7fd6ad55; }
+
+.swatch .chips { display: inline-flex; }
+.swatch .chips i {
+    width: 1.1rem;
+    height: 1.1rem;
+    border-radius: 999px;
+    border: 2px solid #1f1f25;
+    margin-left: -.35rem;
+}
+.swatch .chips i:first-child { margin-left: 0; }
+
+@media (min-width: 40rem) {
+    .themes-grid { grid-template-columns: repeat(5, 1fr); }
+}
+
 .canvas {
     max-width: 44rem;
     margin: 0 auto;

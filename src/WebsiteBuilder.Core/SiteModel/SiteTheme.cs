@@ -8,6 +8,21 @@ public sealed class SiteTheme
 {
     public ColorPalette Palette { get; set; } = new();
     public FontPair Fonts { get; set; } = new();
+
+    /// <summary>An independent copy, so applying a shared preset never aliases the catalog's instance.</summary>
+    public SiteTheme Clone() => new()
+    {
+        Palette = new ColorPalette
+        {
+            Primary = Palette.Primary,
+            Accent = Palette.Accent,
+            Background = Palette.Background,
+            Surface = Palette.Surface,
+            Text = Palette.Text,
+            MutedText = Palette.MutedText,
+        },
+        Fonts = new FontPair { Heading = Fonts.Heading, Body = Fonts.Body },
+    };
 }
 
 public sealed class ColorPalette
