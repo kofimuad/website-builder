@@ -93,3 +93,66 @@
 .edit.button:focus { outline: 2px solid #16161a; }
 
 .empty { max-width: 40rem; margin: 4rem auto; text-align: center; font-family: system-ui, sans-serif; }
+
+.preview-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    background: #2a2a30;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.preview-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: .75rem 1.25rem;
+    background: #16161a;
+    color: #f2f2f5;
+}
+
+.preview-bar-actions { display: flex; gap: .5rem; }
+
+.widths {
+    display: inline-flex;
+    border: 1px solid #3a3a42;
+    border-radius: .5rem;
+    overflow: hidden;
+}
+
+.widths button {
+    padding: .5rem .875rem;
+    border: 0;
+    background: transparent;
+    color: #f2f2f5;
+    font: inherit;
+    font-size: .875rem;
+    cursor: pointer;
+}
+
+.widths button.on { background: #0a7d55; font-weight: 600; }
+
+.preview-stage {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 1.25rem;
+    overflow: auto;
+}
+
+.preview-frame {
+    background: #fff;
+    box-shadow: 0 6px 24px rgb(0 0 0 / 35%);
+    border-radius: .5rem;
+    overflow: hidden;
+    height: 100%;
+}
+
+.preview-frame.desktop { width: 100%; max-width: 70rem; }
+.preview-frame.phone { width: 390px; max-width: 100%; height: 780px; max-height: 100%; }
+
+.preview-frame iframe { width: 100%; height: 100%; border: 0; display: block; }

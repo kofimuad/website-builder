@@ -20,11 +20,32 @@ else
     <div class="bar">
         <span class="status @(_dirty ? "busy" : "")">@_status</span>
         <div class="bar-actions">
-            <a class="btn" href="/preview/@SiteId" target="_blank">Preview</a>
+            <button type="button" class="btn" @onclick="OpenPreview">Preview</button>
             <a class="btn" href="/manage/@SiteId/profile">Business details</a>
             <button type="button" class="btn primary" @onclick="Publish" disabled="@_publishing">Publish</button>
         </div>
     </div>
+
+    @if (_showPreview)
+    {
+        <div class="preview-overlay">
+            <div class="preview-bar">
+                <div class="widths" role="group" aria-label="Preview width">
+                    <button type="button" class="@(_phoneWidth ? "" : "on")" @onclick="() => _phoneWidth = false">Desktop</button>
+                    <button type="button" class="@(_phoneWidth ? "on" : "")" @onclick="() => _phoneWidth = true">Phone</button>
+                </div>
+                <div class="preview-bar-actions">
+                    <button type="button" class="btn" @onclick="RefreshPreview">Refresh</button>
+                    <button type="button" class="btn" @onclick="() => _showPreview = false">Close</button>
+                </div>
+            </div>
+            <div class="preview-stage">
+                <div class="preview-frame @(_phoneWidth ? "phone" : "desktop")">
+                    <iframe title="Preview" src="/preview/@SiteId?v=@_previewNonce"></iframe>
+                </div>
+            </div>
+        </div>
+    }
 
     <div class="canvas">
         <p class="tip">Click any text to edit it. Your changes save on their own.</p>
@@ -100,6 +121,9 @@ else
     private string _status = "Saved";
     private bool _dirty;
     private bool _publishing;
+    private bool _showPreview;
+    private bool _phoneWidth;
+    private int _previewNonce;
     private CancellationTokenSource? _debounce;
 
     protected override async Task OnInitializedAsync()
@@ -163,6 +187,20 @@ else
         }
 
         await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task OpenPreview()
+    {
+        // Save first so the preview reflects the latest edits; the nonce busts the iframe cache.
+        await SaveAsync();
+        _previewNonce++;
+        _showPreview = true;
+    }
+
+    private async Task RefreshPreview()
+    {
+        await SaveAsync();
+        _previewNonce++;
     }
 
     private async Task Publish()
