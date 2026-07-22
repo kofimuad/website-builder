@@ -170,6 +170,31 @@ public class SiteManagementServiceTests(PostgresFixture fixture) : IDisposable
     }
 
     [Fact]
+    public async Task Editing_draft_text_in_place_and_saving_persists_it()
+    {
+        var result = await OnboardAsync($"Editor Co {Guid.NewGuid():N}");
+
+        // Mirror what the editor does: load, mutate the tracked draft in place, save.
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var mgmt = scope.ServiceProvider.GetRequiredService<SiteManagementService>();
+            var managed = await mgmt.LoadAsync(result.SiteId);
+            var hero = managed!.Site.Draft.Sections.OfType<HeroSection>().Single();
+            hero.Headline = "Hand-edited headline";
+            await mgmt.SaveDraftAsync();
+        }
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            scope.ServiceProvider.GetRequiredService<TenantContext>().TenantId = result.TenantId;
+            var db = scope.ServiceProvider.GetRequiredService<WebsiteBuilderDbContext>();
+            var site = await db.Sites.SingleAsync();
+
+            Assert.Equal("Hand-edited headline", site.Draft.Sections.OfType<HeroSection>().Single().Headline);
+        }
+    }
+
+    [Fact]
     public async Task Publishing_makes_the_edited_details_live()
     {
         var result = await OnboardAsync($"Publish Co {Guid.NewGuid():N}");

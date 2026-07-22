@@ -15,8 +15,8 @@
             <p>We've put together a first draft from your answers. Nothing is public yet — this is a preview only.</p>
             <p class="address">@_result.Subdomain.<span>@PlatformSuffix</span></p>
             <div class="actions">
-                <a class="secondary" href="@ManageUrl">Edit details</a>
-                <a class="primary" href="@PreviewUrl">See my website</a>
+                <a class="secondary" href="@PreviewUrl">Preview</a>
+                <a class="primary" href="@EditorUrl">Start editing</a>
             </div>
         </div>
     }
@@ -159,7 +159,7 @@
 
     private string PreviewUrl => $"/preview/{_result!.SiteId}";
 
-    private string ManageUrl => $"/manage/{_result!.SiteId}/profile";
+    private string EditorUrl => $"/manage/{_result!.SiteId}/edit";
 
     private string NextLabel => _wizard.CurrentStep == OnboardingStep.ServiceArea
         ? "Build my website"

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using WebsiteBuilder.Core.Entities;
+using WebsiteBuilder.Core.Onboarding;
 using WebsiteBuilder.Core.SiteModel;
 using WebsiteBuilder.Core.Tenancy;
 using WebsiteBuilder.Data;
@@ -35,6 +36,22 @@ public static class DemoDataSeeder
         var site = new Site { Name = "Main site", Draft = BuildDemoSite() };
         site.Publish();
         db.Sites.Add(site);
+
+        // A matching profile so the editor and Business-details pages are clickable on the demo.
+        db.BusinessProfiles.Add(new BusinessProfile
+        {
+            BusinessName = "Joe's Plumbing",
+            Category = "plumber",
+            Offerings = ["Drain clearing", "Leak detection", "Bathroom fitting"],
+            Tone = BusinessTone.Friendly,
+            PrimaryAction = PrimaryAction.Call,
+            PhoneNumber = "+233200000000",
+            WhatsAppNumber = "+233200000000",
+            Email = "hello@joesplumbing.example",
+            AddressLines = ["12 High Street", "Osu, Accra"],
+            ServiceArea = "Accra",
+        });
+
         await db.SaveChangesAsync(cancellationToken);
     }
 

@@ -62,6 +62,13 @@ public sealed class SiteManagementService(
         await db.SaveChangesAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// Persists in-place edits to the loaded site's draft. The editor mutates the tracked draft
+    /// directly, so this just commits; the tenant must already be in scope (via <see cref="LoadAsync"/>).
+    /// </summary>
+    public Task SaveDraftAsync(CancellationToken cancellationToken = default) =>
+        db.SaveChangesAsync(cancellationToken);
+
     public Task PublishAsync(Guid siteId, CancellationToken cancellationToken = default) =>
         publisher.PublishAsync(siteId, cancellationToken);
 }

@@ -1,0 +1,192 @@
+@page "/manage/{SiteId:guid}/edit"
+@using WebsiteBuilder.Core.SiteModel
+@using WebsiteBuilder.Web.Management
+@rendermode InteractiveServer
+@implements IDisposable
+@inject SiteManagementService Management
+
+<PageTitle>Edit your website</PageTitle>
+
+@if (_notFound)
+{
+    <div class="shell"><div class="empty"><h1>We couldn't find that website</h1></div></div>
+}
+else if (_site is null)
+{
+    <div class="shell"><div class="empty"><p>Loading…</p></div></div>
+}
+else
+{
+    <div class="bar">
+        <span class="status @(_dirty ? "busy" : "")">@_status</span>
+        <div class="bar-actions">
+            <a class="btn" href="/preview/@SiteId" target="_blank">Preview</a>
+            <a class="btn" href="/manage/@SiteId/profile">Business details</a>
+            <button type="button" class="btn primary" @onclick="Publish" disabled="@_publishing">Publish</button>
+        </div>
+    </div>
+
+    <div class="canvas">
+        <p class="tip">Click any text to edit it. Your changes save on their own.</p>
+        @foreach (var section in _site.Draft.Sections)
+        {
+            <section class="block">
+                @switch (section)
+                {
+                    case HeroSection hero:
+                        <input class="edit h1" @bind="hero.Headline" @bind:event="oninput" @bind:after="MarkDirty" placeholder="Your headline" />
+                        <textarea class="edit lead" rows="2" @bind="hero.Subheadline" @bind:event="oninput" @bind:after="MarkDirty" placeholder="A supporting line"></textarea>
+                        <input class="edit button" @bind="hero.CallToActionLabel" @bind:event="oninput" @bind:after="MarkDirty" placeholder="Button text" />
+                        break;
+
+                    case AboutSection about:
+                        <input class="edit h2" @bind="about.Heading" @bind:event="oninput" @bind:after="MarkDirty" placeholder="About heading" />
+                        <textarea class="edit body" rows="4" @bind="about.Body" @bind:event="oninput" @bind:after="MarkDirty" placeholder="Tell customers about your business"></textarea>
+                        break;
+
+                    case ServicesSection services:
+                        <input class="edit h2" @bind="services.Heading" @bind:event="oninput" @bind:after="MarkDirty" placeholder="Services heading" />
+                        @foreach (var item in services.Items)
+                        {
+                            <div class="item">
+                                <input class="edit h3" @bind="item.Title" @bind:event="oninput" @bind:after="MarkDirty" placeholder="Service name" />
+                                <textarea class="edit body" rows="2" @bind="item.Description" @bind:event="oninput" @bind:after="MarkDirty" placeholder="What it is"></textarea>
+                                <input class="edit small" @bind="item.PriceLabel" @bind:event="oninput" @bind:after="MarkDirty" placeholder="Price (optional)" />
+                            </div>
+                        }
+                        break;
+
+                    case TestimonialsSection testimonials:
+                        <input class="edit h2" @bind="testimonials.Heading" @bind:event="oninput" @bind:after="MarkDirty" placeholder="Reviews heading" />
+                        @foreach (var quote in testimonials.Items)
+                        {
+                            <div class="item">
+                                <textarea class="edit body" rows="2" @bind="quote.Quote" @bind:event="oninput" @bind:after="MarkDirty" placeholder="What they said"></textarea>
+                                <input class="edit small" @bind="quote.AuthorName" @bind:event="oninput" @bind:after="MarkDirty" placeholder="Who said it" />
+                            </div>
+                        }
+                        break;
+
+                    case GallerySection gallery:
+                        <input class="edit h2" @bind="gallery.Heading" @bind:event="oninput" @bind:after="MarkDirty" placeholder="Gallery heading" />
+                        <p class="muted">Photos can be added from the Business details page (uploads are coming soon).</p>
+                        break;
+
+                    case ContactSection contact:
+                        <input class="edit h2" @bind="contact.Heading" @bind:event="oninput" @bind:after="MarkDirty" placeholder="Contact heading" />
+                        <p class="muted">Phone, WhatsApp and email are edited on the Business details page so they stay correct everywhere.</p>
+                        break;
+
+                    case HoursMapSection hoursMap:
+                        <input class="edit h2" @bind="hoursMap.Heading" @bind:event="oninput" @bind:after="MarkDirty" placeholder="Find-us heading" />
+                        <p class="muted">Address and opening hours are edited on the Business details page.</p>
+                        break;
+
+                    case CtaSection cta:
+                        <input class="edit h2" @bind="cta.Headline" @bind:event="oninput" @bind:after="MarkDirty" placeholder="Closing line" />
+                        <input class="edit button" @bind="cta.ButtonLabel" @bind:event="oninput" @bind:after="MarkDirty" placeholder="Button text" />
+                        break;
+                }
+            </section>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public Guid SiteId { get; set; }
+
+    private Core.Entities.Site? _site;
+    private bool _notFound;
+    private string _status = "Saved";
+    private bool _dirty;
+    private bool _publishing;
+    private CancellationTokenSource? _debounce;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var managed = await Management.LoadAsync(SiteId);
+        if (managed is null)
+        {
+            _notFound = true;
+            return;
+        }
+
+        _site = managed.Site;
+    }
+
+    /// <summary>Every keystroke marks the draft dirty and (re)arms a short debounce before saving.</summary>
+    private void MarkDirty()
+    {
+        _dirty = true;
+        _status = "Editing…";
+
+        _debounce?.Cancel();
+        _debounce?.Dispose();
+        _debounce = new CancellationTokenSource();
+        _ = SaveAfterPauseAsync(_debounce.Token);
+    }
+
+    private async Task SaveAfterPauseAsync(CancellationToken token)
+    {
+        try
+        {
+            await Task.Delay(1200, token);
+        }
+        catch (TaskCanceledException)
+        {
+            return; // A newer edit arrived; that one will save.
+        }
+
+        await SaveAsync();
+    }
+
+    private async Task SaveAsync()
+    {
+        if (!_dirty)
+        {
+            return;
+        }
+
+        _status = "Saving…";
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            await Management.SaveDraftAsync();
+            _dirty = false;
+            _status = "Saved";
+        }
+        catch (Exception)
+        {
+            // Leave it dirty so the next edit (or the next debounce) retries.
+            _status = "Couldn't save — will retry";
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task Publish()
+    {
+        _publishing = true;
+        try
+        {
+            await SaveAsync();
+            await Management.PublishAsync(SiteId);
+            _status = "Published — your changes are live";
+        }
+        catch (Exception)
+        {
+            _status = "Couldn't publish — please try again";
+        }
+        finally
+        {
+            _publishing = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        _debounce?.Cancel();
+        _debounce?.Dispose();
+    }
+}
