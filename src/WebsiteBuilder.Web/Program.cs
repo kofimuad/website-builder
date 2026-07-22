@@ -1,5 +1,6 @@
 using System.Text.Encodings.Web;
 using System.Text.Unicode;
+using Anthropic;
 using Microsoft.EntityFrameworkCore;
 using WebsiteBuilder.Core.Generation;
 using WebsiteBuilder.Core.Tenancy;
@@ -7,6 +8,7 @@ using WebsiteBuilder.Data;
 using WebsiteBuilder.Web.Caching;
 using WebsiteBuilder.Web.Components;
 using WebsiteBuilder.Web.Development;
+using WebsiteBuilder.Web.Generation;
 using WebsiteBuilder.Web.Middleware;
 using WebsiteBuilder.Web.Onboarding;
 using WebsiteBuilder.Web.Publishing;
@@ -41,8 +43,28 @@ builder.Services.Configure<TenantResolutionOptions>(
 builder.Services.AddScoped<SitePublisher>();
 builder.Services.AddScoped<OnboardingService>();
 
-// Deterministic generation for now; the Claude-backed generator replaces this in WB-3.
-builder.Services.AddSingleton<ISiteGenerator, TemplateSiteGenerator>();
+// Site generation. The deterministic template always exists; when an Anthropic API key is
+// configured, Claude writes the copy and the template becomes the fallback for when the model
+// fails or is unavailable.
+builder.Services.AddSingleton<TemplateSiteGenerator>();
+
+var anthropicKey = builder.Configuration["ANTHROPIC_API_KEY"]
+    ?? Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY");
+
+if (string.IsNullOrWhiteSpace(anthropicKey))
+{
+    builder.Services.AddSingleton<ISiteGenerator>(sp => sp.GetRequiredService<TemplateSiteGenerator>());
+}
+else
+{
+    builder.Services.AddSingleton(new AnthropicClient { ApiKey = anthropicKey });
+    builder.Services.AddSingleton<IClaudeJsonCompletion, AnthropicClaudeCompletion>();
+    builder.Services.AddSingleton<ClaudeSiteGenerator>();
+    builder.Services.AddSingleton<ISiteGenerator>(sp => new FallbackSiteGenerator(
+        primary: sp.GetRequiredService<ClaudeSiteGenerator>(),
+        fallback: sp.GetRequiredService<TemplateSiteGenerator>(),
+        logger: sp.GetRequiredService<ILogger<FallbackSiteGenerator>>()));
+}
 
 // Emit non-ASCII text as UTF-8 rather than numeric entities. Business names and copy are often
 // accented or non-Latin, and escaping every such character inflates the page for no benefit.
