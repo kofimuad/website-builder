@@ -12,9 +12,37 @@
     {
         <div class="card done">
             <h1>Your website is ready to look at</h1>
-            <p>We've put together a first draft from your answers. Nothing is public yet.</p>
+            <p>We've put together a first draft from your answers. Nothing is public yet — this is a preview only.</p>
             <p class="address">@_result.Subdomain.<span>@PlatformSuffix</span></p>
             <a class="primary" href="@PreviewUrl">See my website</a>
+        </div>
+    }
+    else if (_building)
+    {
+        <div class="card">
+            @if (_failed)
+            {
+                <h1>That didn't work</h1>
+                <p>Something went wrong building your website. Your answers are safe — let's try again.</p>
+                <div class="actions">
+                    <button type="button" class="secondary" @onclick="BackToQuestions">Back to my answers</button>
+                    <button type="button" class="primary" @onclick="Build">Try again</button>
+                </div>
+            }
+            else
+            {
+                <h1>Building your website</h1>
+                <p class="hint">This usually takes under a minute. You can watch it come together.</p>
+                <ol class="stages">
+                    @foreach (var (stage, label) in StageRows())
+                    {
+                        <li class="@StageClass(stage)">
+                            <span class="dot"></span>
+                            <span>@label</span>
+                        </li>
+                    }
+                </ol>
+            }
         </div>
     }
     else
@@ -104,11 +132,9 @@
             <div class="actions">
                 @if (!_wizard.IsFirstStep)
                 {
-                    <button type="button" class="secondary" @onclick="Back" disabled="@_working">Back</button>
+                    <button type="button" class="secondary" @onclick="Back">Back</button>
                 }
-                <button type="button" class="primary" @onclick="Next" disabled="@_working">
-                    @(_working ? "Building your website…" : NextLabel)
-                </button>
+                <button type="button" class="primary" @onclick="Next">@NextLabel</button>
             </div>
         </div>
     }
@@ -119,22 +145,16 @@
     private string _offeringsText = "";
     private string _addressText = "";
     private string? _problem;
-    private bool _working;
+    private bool _building;
+    private bool _failed;
+    private OnboardingProgress? _stage;
     private OnboardingResult? _result;
 
     [Inject] private Microsoft.Extensions.Options.IOptions<Core.Tenancy.TenantResolutionOptions> TenantOptions { get; set; } = default!;
 
     private string PlatformSuffix => TenantOptions.Value.PlatformDomain;
 
-    private string PreviewUrl
-    {
-        get
-        {
-            var current = new Uri(Navigation.BaseUri);
-            var port = current.IsDefaultPort ? "" : $":{current.Port}";
-            return $"{current.Scheme}://{_result!.Subdomain}.{PlatformSuffix}{port}/";
-        }
-    }
+    private string PreviewUrl => $"/preview/{_result!.SiteId}";
 
     private string NextLabel => _wizard.CurrentStep == OnboardingStep.ServiceArea
         ? "Build my website"
@@ -150,20 +170,29 @@
             return;
         }
 
-        _working = true;
+        await Build();
+    }
+
+    private async Task Build()
+    {
+        _building = true;
+        _failed = false;
+        _stage = null;
+
+        var reporter = new Progress<OnboardingProgress>(stage =>
+        {
+            _stage = stage;
+            _ = InvokeAsync(StateHasChanged);
+        });
+
         try
         {
-            _result = await OnboardingService.CompleteAsync(_wizard.Answers);
+            _result = await OnboardingService.CompleteAsync(_wizard.Answers, reporter);
         }
         catch (Exception)
         {
             // Never show a stack trace to someone who just wanted a website.
-            _problem = "Something went wrong building your website. Please try again.";
-            _wizard.GoBack();
-        }
-        finally
-        {
-            _working = false;
+            _failed = true;
         }
     }
 
@@ -174,7 +203,40 @@
         _wizard.GoBack();
     }
 
-    /// <summary>The multi-line answers are edited as text and kept as lists.</summary>
+    private void BackToQuestions()
+    {
+        _building = false;
+        _failed = false;
+        _wizard.GoBack();
+    }
+
+    /// <summary>The stepper's fixed rows; the transient "revising" state relabels the writing row.</summary>
+    private IEnumerable<(OnboardingProgress Stage, string Label)> StageRows()
+    {
+        yield return (OnboardingProgress.Preparing, "Setting up your website");
+        yield return (OnboardingProgress.WritingCopy, _stage == OnboardingProgress.Revising ? "Polishing the wording" : "Writing your words");
+        yield return (OnboardingProgress.BuildingPages, "Choosing your look and building your pages");
+        yield return (OnboardingProgress.Finishing, "Almost ready");
+    }
+
+    private string StageClass(OnboardingProgress row)
+    {
+        var current = Order(_stage ?? OnboardingProgress.Preparing);
+        var rowOrder = Order(row);
+        if (rowOrder < current) return "done";
+        if (rowOrder == current) return "active";
+        return "pending";
+    }
+
+    private static int Order(OnboardingProgress stage) => stage switch
+    {
+        OnboardingProgress.Preparing => 0,
+        OnboardingProgress.WritingCopy => 1,
+        OnboardingProgress.Revising => 1,
+        OnboardingProgress.BuildingPages => 2,
+        _ => 3,
+    };
+
     private void CaptureTextAreas()
     {
         if (_wizard.CurrentStep == OnboardingStep.Offerings)

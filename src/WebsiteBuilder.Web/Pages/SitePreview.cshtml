@@ -1,0 +1,6 @@
+@page "/preview/{siteId:guid}"
+@model WebsiteBuilder.Web.Pages.SitePreviewModel
+@{
+    Layout = null;
+}
+@await Html.PartialAsync("_RenderedSite", Model.Draft!)

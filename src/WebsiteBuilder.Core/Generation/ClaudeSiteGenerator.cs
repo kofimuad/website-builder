@@ -25,7 +25,10 @@ public sealed class ClaudeSiteGenerator(
         PropertyNameCaseInsensitive = true,
     };
 
-    public async Task<SiteDefinition> GenerateAsync(BusinessProfile profile, CancellationToken cancellationToken = default)
+    public async Task<SiteDefinition> GenerateAsync(
+        BusinessProfile profile,
+        IProgress<OnboardingProgress>? progress = null,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(profile);
 
@@ -34,6 +37,9 @@ public sealed class ClaudeSiteGenerator(
 
         for (var attempt = 1; attempt <= MaxAttempts; attempt++)
         {
+            // A first pass is "writing"; every retry is a genuine "revising" event, not a timer.
+            progress?.Report(attempt == 1 ? OnboardingProgress.WritingCopy : OnboardingProgress.Revising);
+
             var user = SiteGenerationPrompt.BuildUser(profile, attempt == 1 ? null : lastViolations);
 
             var result = await completion.CompleteAsync(SiteGenerationPrompt.System, user, schema, cancellationToken);
@@ -66,6 +72,7 @@ public sealed class ClaudeSiteGenerator(
                 continue;
             }
 
+            progress?.Report(OnboardingProgress.BuildingPages);
             return SiteContentAssembler.Assemble(content, profile);
         }
 

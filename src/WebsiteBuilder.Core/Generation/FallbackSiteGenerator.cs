@@ -14,11 +14,14 @@ public sealed class FallbackSiteGenerator(
     ISiteGenerator fallback,
     ILogger<FallbackSiteGenerator> logger) : ISiteGenerator
 {
-    public async Task<SiteDefinition> GenerateAsync(BusinessProfile profile, CancellationToken cancellationToken = default)
+    public async Task<SiteDefinition> GenerateAsync(
+        BusinessProfile profile,
+        IProgress<OnboardingProgress>? progress = null,
+        CancellationToken cancellationToken = default)
     {
         try
         {
-            return await primary.GenerateAsync(profile, cancellationToken);
+            return await primary.GenerateAsync(profile, progress, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -28,7 +31,7 @@ public sealed class FallbackSiteGenerator(
         catch (Exception ex)
         {
             logger.LogWarning(ex, "AI generation failed for {Business}; using the template site instead.", profile.BusinessName);
-            return await fallback.GenerateAsync(profile, cancellationToken);
+            return await fallback.GenerateAsync(profile, progress, cancellationToken);
         }
     }
 }

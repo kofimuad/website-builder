@@ -10,14 +10,22 @@ namespace WebsiteBuilder.Core.Generation;
 /// </summary>
 public sealed class TemplateSiteGenerator : ISiteGenerator
 {
-    public Task<SiteDefinition> GenerateAsync(BusinessProfile profile, CancellationToken cancellationToken = default)
+    public Task<SiteDefinition> GenerateAsync(
+        BusinessProfile profile,
+        IProgress<OnboardingProgress>? progress = null,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(profile);
 
+        progress?.Report(OnboardingProgress.WritingCopy);
+        var meta = BuildMeta(profile);
+        var theme = BuildTheme(profile.Tone);
+
+        progress?.Report(OnboardingProgress.BuildingPages);
         var definition = new SiteDefinition
         {
-            Meta = BuildMeta(profile),
-            Theme = BuildTheme(profile.Tone),
+            Meta = meta,
+            Theme = theme,
             Sections = BuildSections(profile),
         };
 

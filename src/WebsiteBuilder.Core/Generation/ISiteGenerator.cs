@@ -10,5 +10,12 @@ namespace WebsiteBuilder.Core.Generation;
 /// </summary>
 public interface ISiteGenerator
 {
-    Task<SiteDefinition> GenerateAsync(BusinessProfile profile, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Builds a draft site from the profile. <paramref name="progress"/>, if supplied, receives the
+    /// real stages as the work reaches them (see <see cref="OnboardingProgress"/>).
+    /// </summary>
+    Task<SiteDefinition> GenerateAsync(
+        BusinessProfile profile,
+        IProgress<OnboardingProgress>? progress = null,
+        CancellationToken cancellationToken = default);
 }

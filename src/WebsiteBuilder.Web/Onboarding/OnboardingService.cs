@@ -19,9 +19,14 @@ public sealed class OnboardingService(
     ISiteGenerator generator,
     IOptions<TenantResolutionOptions> tenantOptions)
 {
-    public async Task<OnboardingResult> CompleteAsync(BusinessProfile answers, CancellationToken cancellationToken = default)
+    public async Task<OnboardingResult> CompleteAsync(
+        BusinessProfile answers,
+        IProgress<OnboardingProgress>? progress = null,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(answers);
+
+        progress?.Report(OnboardingProgress.Preparing);
 
         var subdomain = await SubdomainSuggester.SuggestAsync(
             answers.BusinessName,
@@ -44,10 +49,11 @@ public sealed class OnboardingService(
         var site = new Site
         {
             Name = answers.BusinessName,
-            Draft = await generator.GenerateAsync(answers, cancellationToken),
+            Draft = await generator.GenerateAsync(answers, progress, cancellationToken),
         };
         db.Sites.Add(site);
 
+        progress?.Report(OnboardingProgress.Finishing);
         await db.SaveChangesAsync(cancellationToken);
 
         return new OnboardingResult(tenant.Id, site.Id, subdomain);

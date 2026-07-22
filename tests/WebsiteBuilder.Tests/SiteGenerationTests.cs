@@ -362,6 +362,6 @@ public class ClaudeSiteGeneratorTests
             fallback: new TemplateSiteGenerator(),
             logger: NullLogger<FallbackSiteGenerator>.Instance);
 
-        await Assert.ThrowsAsync<OperationCanceledException>(() => fallback.GenerateAsync(Profile(), cts.Token));
+        await Assert.ThrowsAsync<OperationCanceledException>(() => fallback.GenerateAsync(Profile(), progress: null, cts.Token));
     }
 }
