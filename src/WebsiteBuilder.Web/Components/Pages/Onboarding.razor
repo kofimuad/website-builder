@@ -14,7 +14,10 @@
             <h1>Your website is ready to look at</h1>
             <p>We've put together a first draft from your answers. Nothing is public yet — this is a preview only.</p>
             <p class="address">@_result.Subdomain.<span>@PlatformSuffix</span></p>
-            <a class="primary" href="@PreviewUrl">See my website</a>
+            <div class="actions">
+                <a class="secondary" href="@ManageUrl">Edit details</a>
+                <a class="primary" href="@PreviewUrl">See my website</a>
+            </div>
         </div>
     }
     else if (_building)
@@ -155,6 +158,8 @@
     private string PlatformSuffix => TenantOptions.Value.PlatformDomain;
 
     private string PreviewUrl => $"/preview/{_result!.SiteId}";
+
+    private string ManageUrl => $"/manage/{_result!.SiteId}/profile";
 
     private string NextLabel => _wizard.CurrentStep == OnboardingStep.ServiceArea
         ? "Build my website"

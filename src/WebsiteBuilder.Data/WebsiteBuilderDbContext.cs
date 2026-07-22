@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
@@ -45,6 +46,18 @@ public class WebsiteBuilderDbContext : DbContext
         definition => definition == null ? 0 : SiteDefinitionSerializer.Serialize(definition).GetHashCode(),
         definition => definition == null ? null : definition.DeepClone());
 
+    // Opening hours are a small structured list; stored as jsonb rather than a side table.
+    private static readonly ValueConverter<List<OpeningHours>, string> HoursConverter = new(
+        hours => JsonSerializer.Serialize(hours, (JsonSerializerOptions?)null),
+        json => JsonSerializer.Deserialize<List<OpeningHours>>(json, (JsonSerializerOptions?)null) ?? new());
+
+    private static readonly ValueComparer<List<OpeningHours>> HoursComparer = new(
+        (left, right) => JsonSerializer.Serialize(left, (JsonSerializerOptions?)null)
+            == JsonSerializer.Serialize(right, (JsonSerializerOptions?)null),
+        hours => JsonSerializer.Serialize(hours, (JsonSerializerOptions?)null).GetHashCode(),
+        hours => JsonSerializer.Deserialize<List<OpeningHours>>(
+            JsonSerializer.Serialize(hours, (JsonSerializerOptions?)null), (JsonSerializerOptions?)null) ?? new());
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Tenant>(e =>
@@ -79,6 +92,7 @@ public class WebsiteBuilderDbContext : DbContext
             e.Property(p => p.Category).HasMaxLength(200).IsRequired();
             e.Property(p => p.Tone).HasConversion<string>().HasMaxLength(32);
             e.Property(p => p.PrimaryAction).HasConversion<string>().HasMaxLength(32);
+            e.Property(p => p.OpeningHours).HasColumnType("jsonb").HasConversion(HoursConverter, HoursComparer);
             // One profile per tenant: onboarding fills it, WB-18 edits the same row.
             e.HasIndex(p => p.TenantId).IsUnique();
             e.HasOne<Tenant>().WithMany().HasForeignKey(p => p.TenantId).OnDelete(DeleteBehavior.Cascade);

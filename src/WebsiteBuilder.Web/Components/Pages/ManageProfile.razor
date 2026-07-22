@@ -1,0 +1,175 @@
+@page "/manage/{SiteId:guid}/profile"
+@using WebsiteBuilder.Core.Onboarding
+@using WebsiteBuilder.Core.SiteModel
+@using WebsiteBuilder.Web.Management
+@rendermode InteractiveServer
+@inject SiteManagementService Management
+
+<PageTitle>Your business details</PageTitle>
+
+<div class="manage">
+    @if (_notFound)
+    {
+        <div class="card">
+            <h1>We couldn't find that website</h1>
+            <p>The link may be wrong, or the site may have been removed.</p>
+        </div>
+    }
+    else if (_profile is null)
+    {
+        <div class="card"><p>Loading…</p></div>
+    }
+    else
+    {
+        <div class="card">
+            <h1>Your business details</h1>
+            <p class="hint">Update these and they'll flow into your website. Changes stay in your draft until you publish.</p>
+
+            <label>Business name<input @bind="_profile.BusinessName" /></label>
+
+            <h2>How customers reach you</h2>
+            <label>Phone<input @bind="_profile.PhoneNumber" placeholder="+233 20 000 0000" /></label>
+            <label>WhatsApp<input @bind="_profile.WhatsAppNumber" placeholder="+233 20 000 0000" /></label>
+            <label>Email<input @bind="_profile.Email" placeholder="you@example.com" /></label>
+
+            <h2>Where you are</h2>
+            <label>Area you cover<input @bind="_profile.ServiceArea" placeholder="Osu and East Legon" /></label>
+            <label>Address<textarea rows="3" @bind="_addressText" placeholder="12 High Street&#10;Osu, Accra"></textarea></label>
+
+            <h2>Opening hours</h2>
+            <div class="hours">
+                @foreach (var row in _hours)
+                {
+                    <div class="hours-row">
+                        <span class="day">@row.Day</span>
+                        <label class="closed"><input type="checkbox" @bind="row.Closed" /> Closed</label>
+                        @if (!row.Closed)
+                        {
+                            <input type="time" @bind="row.Opens" />
+                            <span>to</span>
+                            <input type="time" @bind="row.Closes" />
+                        }
+                    </div>
+                }
+            </div>
+
+            @if (_message is not null)
+            {
+                <p class="@(_isError ? "problem" : "ok")" role="status">@_message</p>
+            }
+
+            <div class="actions">
+                <a class="secondary" href="/preview/@SiteId" target="_blank">Preview draft</a>
+                <button type="button" class="secondary" @onclick="Save" disabled="@_busy">Save changes</button>
+                <button type="button" class="primary" @onclick="Publish" disabled="@_busy">Save &amp; publish</button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid SiteId { get; set; }
+
+    private BusinessProfile? _profile;
+    private bool _notFound;
+    private string _addressText = "";
+    private List<DayRow> _hours = [];
+    private string? _message;
+    private bool _isError;
+    private bool _busy;
+
+    private sealed class DayRow
+    {
+        public DayOfWeek Day { get; init; }
+        public bool Closed { get; set; }
+        public TimeOnly? Opens { get; set; }
+        public TimeOnly? Closes { get; set; }
+    }
+
+    private static readonly DayOfWeek[] Week =
+    [
+        DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday,
+        DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday,
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var managed = await Management.LoadAsync(SiteId);
+        if (managed is null)
+        {
+            _notFound = true;
+            return;
+        }
+
+        _profile = managed.Profile;
+        _addressText = string.Join("\n", _profile.AddressLines);
+        _hours = BuildHourRows(_profile.OpeningHours);
+    }
+
+    private static List<DayRow> BuildHourRows(IReadOnlyList<OpeningHours> saved)
+    {
+        var byDay = saved.ToDictionary(h => h.Day);
+        return Week.Select(day =>
+        {
+            if (byDay.TryGetValue(day, out var h) && !h.Closed && h.Opens is not null && h.Closes is not null)
+            {
+                return new DayRow { Day = day, Closed = false, Opens = h.Opens, Closes = h.Closes };
+            }
+            return new DayRow { Day = day, Closed = true };
+        }).ToList();
+    }
+
+    private void ApplyEdits()
+    {
+        _profile!.AddressLines = _addressText
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToList();
+
+        _profile.OpeningHours = _hours.Select(row =>
+            row.Closed || row.Opens is null || row.Closes is null
+                ? new OpeningHours { Day = row.Day, Closed = true }
+                : new OpeningHours { Day = row.Day, Closed = false, Opens = row.Opens, Closes = row.Closes })
+            .ToList();
+    }
+
+    private async Task Save()
+    {
+        await Run(async () =>
+        {
+            await Management.SaveProfileAsync(SiteId);
+            _message = "Saved to your draft. Preview it, then publish when you're happy.";
+            _isError = false;
+        });
+    }
+
+    private async Task Publish()
+    {
+        await Run(async () =>
+        {
+            await Management.SaveProfileAsync(SiteId);
+            await Management.PublishAsync(SiteId);
+            _message = "Your changes are live.";
+            _isError = false;
+        });
+    }
+
+    private async Task Run(Func<Task> action)
+    {
+        _busy = true;
+        _message = null;
+        try
+        {
+            ApplyEdits();
+            await action();
+        }
+        catch (Exception)
+        {
+            _message = "Something went wrong saving your changes. Please try again.";
+            _isError = true;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

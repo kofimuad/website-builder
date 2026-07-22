@@ -1,3 +1,4 @@
+using WebsiteBuilder.Core.SiteModel;
 using WebsiteBuilder.Core.Tenancy;
 
 namespace WebsiteBuilder.Core.Onboarding;
@@ -45,6 +46,9 @@ public class BusinessProfile : ITenantOwned
     public string? Email { get; set; }
 
     public List<string> AddressLines { get; set; } = [];
+
+    /// <summary>Opening times, edited on the profile page (WB-18). Empty until the owner adds them.</summary>
+    public List<OpeningHours> OpeningHours { get; set; } = [];
 
     /// <summary>Where they work, in their words: "Osu and East Legon", "all of Accra".</summary>
     public string? ServiceArea { get; set; }
