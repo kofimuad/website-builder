@@ -7,138 +7,230 @@
 
 <PageTitle>Let's build your website</PageTitle>
 
-<div class="interview">
+<div class="onb">
+    <header class="onb-top">
+        <a class="brand" href="/">
+            <span class="brand-mark">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="7" x="3" y="3" rx="1"/><rect width="9" height="7" x="3" y="14" rx="1"/><rect width="5" height="7" x="16" y="14" rx="1"/></svg>
+            </span>
+            <span class="brand-name">Sitely</span>
+        </a>
+        <div class="onb-top-right">
+            <span class="autosave">Progress saved automatically</span>
+            <a class="ghost-btn" href="/">Save &amp; exit</a>
+        </div>
+    </header>
+
     @if (_result is not null)
     {
-        <div class="card done">
-            <h1>Your website is ready to look at</h1>
-            <p>We've put together a first draft from your answers. Nothing is public yet — this is a preview only.</p>
-            <p class="address">@_result.Subdomain.<span>@PlatformSuffix</span></p>
-            <div class="actions">
-                <a class="secondary" href="@PreviewUrl">Preview</a>
-                <a class="primary" href="@EditorUrl">Start editing</a>
+        <div class="onb-center">
+            <div class="done-card">
+                <span class="done-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                </span>
+                <h1>Your website is ready to look at</h1>
+                <p>We've put together a first draft from your answers. Nothing is public yet — this is a preview only.</p>
+                <p class="address">@_result.Subdomain.<span>@PlatformSuffix</span></p>
+                <div class="actions">
+                    <a class="secondary" href="@PreviewUrl">Preview</a>
+                    <a class="primary" href="@EditorUrl">Start editing</a>
+                </div>
             </div>
         </div>
     }
     else if (_building)
     {
-        <div class="card">
-            @if (_failed)
-            {
-                <h1>That didn't work</h1>
-                <p>Something went wrong building your website. Your answers are safe — let's try again.</p>
-                <div class="actions">
-                    <button type="button" class="secondary" @onclick="BackToQuestions">Back to my answers</button>
-                    <button type="button" class="primary" @onclick="Build">Try again</button>
-                </div>
-            }
-            else
-            {
-                <h1>Building your website</h1>
-                <p class="hint">This usually takes under a minute. You can watch it come together.</p>
-                <ol class="stages">
-                    @foreach (var (stage, label) in StageRows())
-                    {
-                        <li class="@StageClass(stage)">
-                            <span class="dot"></span>
-                            <span>@label</span>
-                        </li>
-                    }
-                </ol>
-            }
+        <div class="onb-center">
+            <div class="building-card">
+                @if (_failed)
+                {
+                    <h1>That didn't work</h1>
+                    <p>Something went wrong building your website. Your answers are safe — let's try again.</p>
+                    <div class="actions">
+                        <button type="button" class="secondary" @onclick="BackToQuestions">Back to my answers</button>
+                        <button type="button" class="primary" @onclick="Build">Try again</button>
+                    </div>
+                }
+                else
+                {
+                    <span class="build-spark">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg>
+                    </span>
+                    <h1>Building your website</h1>
+                    <p class="hint">This usually takes under a minute. You can watch it come together.</p>
+                    <ol class="stages">
+                        @foreach (var (stage, label) in StageRows())
+                        {
+                            <li class="@StageClass(stage)">
+                                <span class="dot"></span>
+                                <span>@label</span>
+                            </li>
+                        }
+                    </ol>
+                }
+            </div>
         </div>
     }
     else
     {
-        <div class="card">
-            <p class="progress-label">Question @_wizard.StepNumber of @_wizard.StepCount</p>
-            <div class="progress" role="progressbar" aria-valuenow="@_wizard.StepNumber" aria-valuemin="1" aria-valuemax="@_wizard.StepCount">
-                <span style="width:@(_wizard.StepNumber * 100 / _wizard.StepCount)%"></span>
-            </div>
-
-            @switch (_wizard.CurrentStep)
-            {
-                case OnboardingStep.BusinessName:
-                    <h1>What's your business called?</h1>
-                    <p class="hint">This goes at the top of your website.</p>
-                    <input @bind="_wizard.Answers.BusinessName" @bind:event="oninput" autofocus
-                           placeholder="Joe's Plumbing" />
-                    break;
-
-                case OnboardingStep.Category:
-                    <h1>What kind of business is it?</h1>
-                    <p class="hint">In your own words &mdash; plumber, hair salon, bakery.</p>
-                    <input @bind="_wizard.Answers.Category" @bind:event="oninput" placeholder="Plumber" />
-                    break;
-
-                case OnboardingStep.Offerings:
-                    <h1>What do you offer?</h1>
-                    <p class="hint">One per line. Three or four is plenty.</p>
-                    <textarea rows="5" @bind="_offeringsText" @bind:event="oninput"
-                              placeholder="Drain clearing&#10;Leak repair&#10;Bathroom fitting"></textarea>
-                    break;
-
-                case OnboardingStep.Tone:
-                    <h1>How should your website sound?</h1>
-                    <p class="hint">You can change this later.</p>
-                    <div class="choices">
-                        @foreach (var tone in Enum.GetValues<BusinessTone>())
-                        {
-                            <button type="button" class="choice @(_wizard.Answers.Tone == tone ? "selected" : "")"
-                                    @onclick="() => _wizard.Answers.Tone = tone">
-                                <strong>@ToneLabel(tone)</strong>
-                                <span>@ToneHint(tone)</span>
-                            </button>
-                        }
+        <div class="onb-body">
+            <div class="interview">
+                <div class="progress-block">
+                    <div class="progress-top">
+                        <span class="step-count">Question @_wizard.StepNumber of @_wizard.StepCount</span>
+                        <span class="step-name">@StepName(_wizard.CurrentStep)</span>
                     </div>
-                    break;
-
-                case OnboardingStep.Photos:
-                    <h1>Got photos of your work?</h1>
-                    <p class="hint">You can add these later &mdash; your website will look good without them.</p>
-                    <p class="note">Photo uploads are coming soon. Skip for now and we'll build your site without them.</p>
-                    break;
-
-                case OnboardingStep.Contact:
-                    <h1>How should customers reach you?</h1>
-                    <p class="hint">Fill in whichever you use. At least one, please.</p>
-                    <label>Phone<input @bind="_wizard.Answers.PhoneNumber" @bind:event="oninput" placeholder="+233 20 000 0000" /></label>
-                    <label>WhatsApp<input @bind="_wizard.Answers.WhatsAppNumber" @bind:event="oninput" placeholder="+233 20 000 0000" /></label>
-                    <label>Email<input @bind="_wizard.Answers.Email" @bind:event="oninput" placeholder="you@example.com" /></label>
-
-                    <p class="hint spaced">What should customers do first?</p>
-                    <div class="choices">
-                        @foreach (var action in Enum.GetValues<PrimaryAction>())
-                        {
-                            <button type="button" class="choice @(_wizard.Answers.PrimaryAction == action ? "selected" : "")"
-                                    @onclick="() => _wizard.Answers.PrimaryAction = action">
-                                <strong>@ActionLabel(action)</strong>
-                            </button>
-                        }
+                    <div class="track" role="progressbar" aria-valuenow="@_wizard.StepNumber" aria-valuemin="1" aria-valuemax="@_wizard.StepCount">
+                        <span style="width:@(_wizard.StepNumber * 100 / _wizard.StepCount)%"></span>
                     </div>
-                    break;
+                </div>
 
-                case OnboardingStep.ServiceArea:
-                    <h1>Where do you work?</h1>
-                    <p class="hint">The area you cover, and your address if customers visit you.</p>
-                    <label>Area you cover<input @bind="_wizard.Answers.ServiceArea" @bind:event="oninput" placeholder="Osu and East Legon" /></label>
-                    <label>Address (optional)<textarea rows="3" @bind="_addressText" @bind:event="oninput"
-                                                       placeholder="12 High Street&#10;Osu, Accra"></textarea></label>
-                    break;
-            }
+                <div class="asker">
+                    <span class="asker-avatar">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg>
+                    </span>
+                    <span>Sitely is asking</span>
+                </div>
 
-            @if (_problem is not null)
-            {
-                <p class="problem" role="alert">@_problem</p>
-            }
-
-            <div class="actions">
-                @if (!_wizard.IsFirstStep)
+                @switch (_wizard.CurrentStep)
                 {
-                    <button type="button" class="secondary" @onclick="Back">Back</button>
+                    case OnboardingStep.BusinessName:
+                        <h1>What's your business called?</h1>
+                        <p class="hint">This goes at the top of your website.</p>
+                        <input class="field" @bind="_wizard.Answers.BusinessName" @bind:event="oninput" autofocus
+                               placeholder="Joe's Plumbing" />
+                        break;
+
+                    case OnboardingStep.Category:
+                        <h1>What kind of business is it?</h1>
+                        <p class="hint">In your own words &mdash; plumber, hair salon, bakery.</p>
+                        <input class="field" @bind="_wizard.Answers.Category" @bind:event="oninput" placeholder="Plumber" />
+                        <p class="chips-label">Or start from a common type:</p>
+                        <div class="chips">
+                            @foreach (var suggestion in CategorySuggestions)
+                            {
+                                <button type="button" class="chip @(_wizard.Answers.Category == suggestion ? "on" : "")"
+                                        @onclick="() => _wizard.Answers.Category = suggestion">@suggestion</button>
+                            }
+                        </div>
+                        break;
+
+                    case OnboardingStep.Offerings:
+                        <h1>What do you offer?</h1>
+                        <p class="hint">One per line. Three or four is plenty.</p>
+                        <textarea class="field" rows="5" @bind="_offeringsText" @bind:event="oninput"
+                                  placeholder="Drain clearing&#10;Leak repair&#10;Bathroom fitting"></textarea>
+                        break;
+
+                    case OnboardingStep.Tone:
+                        <h1>How should your website sound?</h1>
+                        <p class="hint">You can change this later.</p>
+                        <div class="choices">
+                            @foreach (var tone in Enum.GetValues<BusinessTone>())
+                            {
+                                <button type="button" class="choice @(_wizard.Answers.Tone == tone ? "selected" : "")"
+                                        @onclick="() => _wizard.Answers.Tone = tone">
+                                    <strong>@ToneLabel(tone)</strong>
+                                    <span>@ToneHint(tone)</span>
+                                </button>
+                            }
+                        </div>
+                        break;
+
+                    case OnboardingStep.Photos:
+                        <h1>Got photos of your work?</h1>
+                        <p class="hint">You can add these later &mdash; your website will look good without them.</p>
+                        <p class="note">Photo uploads are coming soon. Skip for now and we'll build your site without them.</p>
+                        break;
+
+                    case OnboardingStep.Contact:
+                        <h1>How should customers reach you?</h1>
+                        <p class="hint">Fill in whichever you use. At least one, please.</p>
+                        <label class="labelled">Phone<input class="field" @bind="_wizard.Answers.PhoneNumber" @bind:event="oninput" placeholder="+233 20 000 0000" /></label>
+                        <label class="labelled">WhatsApp<input class="field" @bind="_wizard.Answers.WhatsAppNumber" @bind:event="oninput" placeholder="+233 20 000 0000" /></label>
+                        <label class="labelled">Email<input class="field" @bind="_wizard.Answers.Email" @bind:event="oninput" placeholder="you@example.com" /></label>
+
+                        <p class="hint spaced">What should customers do first?</p>
+                        <div class="choices">
+                            @foreach (var action in Enum.GetValues<PrimaryAction>())
+                            {
+                                <button type="button" class="choice @(_wizard.Answers.PrimaryAction == action ? "selected" : "")"
+                                        @onclick="() => _wizard.Answers.PrimaryAction = action">
+                                    <strong>@ActionLabel(action)</strong>
+                                </button>
+                            }
+                        </div>
+                        break;
+
+                    case OnboardingStep.ServiceArea:
+                        <h1>Where do you work?</h1>
+                        <p class="hint">The area you cover, and your address if customers visit you.</p>
+                        <label class="labelled">Area you cover<input class="field" @bind="_wizard.Answers.ServiceArea" @bind:event="oninput" placeholder="Osu and East Legon" /></label>
+                        <label class="labelled">Address (optional)<textarea class="field" rows="3" @bind="_addressText" @bind:event="oninput"
+                                                           placeholder="12 High Street&#10;Osu, Accra"></textarea></label>
+                        break;
                 }
-                <button type="button" class="primary" @onclick="Next">@NextLabel</button>
+
+                @if (_problem is not null)
+                {
+                    <p class="problem" role="alert">@_problem</p>
+                }
+
+                <div class="nav-row">
+                    @if (!_wizard.IsFirstStep)
+                    {
+                        <button type="button" class="back" @onclick="Back">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+                            Back
+                        </button>
+                    }
+                    else
+                    {
+                        <span></span>
+                    }
+                    <button type="button" class="continue" @onclick="Next">
+                        @NextLabel
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                    </button>
+                </div>
             </div>
+
+            <aside class="preview-panel">
+                <div class="preview-head">
+                    <span class="preview-label">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
+                        Building your site as we talk
+                    </span>
+                    <span class="live-pill"><i></i>Live preview</span>
+                </div>
+                <div class="browser">
+                    <div class="browser-bar">
+                        <span class="dots"><i></i><i></i><i></i></span>
+                        <span class="addr">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                            @(PreviewSubdomain).sitely.site
+                        </span>
+                    </div>
+                    <div class="mini-page">
+                        <div class="mini-nav">
+                            <span class="mini-brand">@PreviewBrand</span>
+                            <span class="mini-links"><span>Services</span><span>About</span><span>Contact</span></span>
+                            <span class="mini-call">Call now</span>
+                        </div>
+                        <div class="mini-hero">
+                            <span class="mini-eyebrow">Same-day plumbing · Accra</span>
+                            <div class="mini-head">Blocked drain? We come today.</div>
+                            <div class="mini-sub">Family-run plumbers serving Accra since 1996. No callout fee, honest pricing, work done right the first time.</div>
+                            <div class="mini-cta"><span class="mini-primary">Get a free quote</span><span class="mini-secondary">WhatsApp us</span></div>
+                        </div>
+                        <div class="mini-strip">
+                            <span class="mini-feat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>Same-day service</span>
+                            <span class="mini-feat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>5-year guarantee</span>
+                            <span class="mini-feat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>No callout fee</span>
+                        </div>
+                    </div>
+                </div>
+            </aside>
         </div>
     }
 </div>
@@ -163,7 +255,41 @@
 
     private string NextLabel => _wizard.CurrentStep == OnboardingStep.ServiceArea
         ? "Build my website"
-        : OnboardingWizard.IsOptional(_wizard.CurrentStep) ? "Skip" : "Next";
+        : OnboardingWizard.IsOptional(_wizard.CurrentStep) ? "Skip" : "Continue";
+
+    private static readonly string[] CategorySuggestions =
+        ["Plumbing", "Bakery", "Salon & spa", "Cleaning", "Electrician"];
+
+    private string PreviewBrand => string.IsNullOrWhiteSpace(_wizard.Answers.BusinessName)
+        ? "Rapid Flow Plumbing"
+        : _wizard.Answers.BusinessName;
+
+    private string PreviewSubdomain
+    {
+        get
+        {
+            var name = _wizard.Answers.BusinessName;
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return "rapidflow";
+            }
+
+            var slug = new string(name.ToLowerInvariant().Where(char.IsLetterOrDigit).ToArray());
+            return string.IsNullOrEmpty(slug) ? "rapidflow" : slug;
+        }
+    }
+
+    private static string StepName(OnboardingStep step) => step switch
+    {
+        OnboardingStep.BusinessName => "Your business",
+        OnboardingStep.Category => "About your business",
+        OnboardingStep.Offerings => "What you offer",
+        OnboardingStep.Tone => "Your style",
+        OnboardingStep.Photos => "Photos",
+        OnboardingStep.Contact => "Getting in touch",
+        OnboardingStep.ServiceArea => "Where you work",
+        _ => "",
+    };
 
     private async Task Next()
     {

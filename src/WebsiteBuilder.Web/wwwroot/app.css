@@ -1,3 +1,28 @@
+:root {
+    --accent: #0A7D55;
+    --accent-strong: #0A6B49;
+    --fg: #15211A;
+    --fg2: #47624F;
+    --fg-muted: #7C9A82;
+    --fg-inv: #FFFFFF;
+    --ground: #F6F5F1;
+    --inverse: #14251B;
+    --tile: #DCE8D2;
+    --tile2: #ECF2E6;
+    --gold: #E8A100;
+    --line: #D6D9CF;
+    --font-head: 'Geist', system-ui, sans-serif;
+    --font-body: 'Inter', system-ui, sans-serif;
+}
+
+body {
+    margin: 0;
+    font-family: var(--font-body);
+    color: var(--fg);
+    background: var(--ground);
+    -webkit-font-smoothing: antialiased;
+}
+
 h1:focus {
     outline: none;
 }

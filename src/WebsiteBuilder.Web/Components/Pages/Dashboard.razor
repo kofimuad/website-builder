@@ -1,0 +1,218 @@
+@page "/dashboard"
+
+<PageTitle>Your dashboard — Sitely</PageTitle>
+
+@* NOTE: presentational only. Leads, visitor stats and sign-in have no backend yet (WB-5 / WB-15);
+   the numbers and rows below are illustrative sample data. *@
+
+<div class="dash">
+    <aside class="sidebar">
+        <a class="side-brand" href="/">
+            <span class="side-mark">@Icon("layout-template")</span>
+            <span class="side-word">Sitely</span>
+        </a>
+
+        <nav class="side-nav">
+            @foreach (var item in Nav)
+            {
+                <a class="nav-item @(item.Active ? "active" : "")" href="@item.Href">
+                    <span class="nav-ico">@Icon(item.Icon)</span>
+                    <span class="nav-label">@item.Label</span>
+                    @if (item.Badge is not null)
+                    {
+                        <span class="nav-badge">@item.Badge</span>
+                    }
+                </a>
+            }
+        </nav>
+
+        <div class="side-spacer"></div>
+
+        <div class="upgrade">
+            <div class="upgrade-t">You're on the free plan</div>
+            <div class="upgrade-s">Connect your own domain and remove the Sitely badge.</div>
+            <a class="upgrade-btn" href="#">Upgrade</a>
+        </div>
+        <div class="profile">
+            <span class="profile-av">K</span>
+            <span class="profile-txt">
+                <span class="profile-name">Kwame O.</span>
+                <span class="profile-biz">Rapid Flow Plumbing</span>
+            </span>
+        </div>
+    </aside>
+
+    <main class="main">
+        <header class="head">
+            <div class="head-left">
+                <h1>Good morning, Kwame</h1>
+                <p>Here's how your website is doing this week.</p>
+            </div>
+            <div class="head-right">
+                <a class="btn ghost" href="#">@Icon("external-link") View site</a>
+                <a class="btn solid" href="#">@Icon("pencil") Edit site</a>
+            </div>
+        </header>
+
+        <section class="status-card">
+            <div class="status-left">
+                <span class="status-dot">@Icon("check")</span>
+                <div class="status-info">
+                    <div class="status-row">
+                        <span class="status-title">Your site is live</span>
+                        <span class="status-pill"><i></i>Published</span>
+                    </div>
+                    <div class="status-url">
+                        @Icon("globe")
+                        <span>rapidflow.sitely.site</span>
+                        <span class="status-updated">·&nbsp; Updated 2 hours ago</span>
+                    </div>
+                </div>
+            </div>
+            <a class="domain-btn" href="#">@Icon("link") Connect custom domain</a>
+        </section>
+
+        <section class="stats">
+            @foreach (var s in Stats)
+            {
+                <div class="stat">
+                    <div class="stat-top">
+                        <span class="stat-label">@s.Label</span>
+                        <span class="stat-ico">@Icon(s.Icon)</span>
+                    </div>
+                    <div class="stat-value">@s.Value</div>
+                    <div class="stat-note @(s.Accent ? "up" : "")">@s.Note</div>
+                </div>
+            }
+        </section>
+
+        <section class="bottom">
+            <div class="leads-card">
+                <div class="leads-head">
+                    <div class="leads-title">
+                        <span>Recent leads</span>
+                        <span class="new-badge">3 new</span>
+                    </div>
+                    <a class="view-all" href="#">View all</a>
+                </div>
+                <div class="table">
+                    @foreach (var lead in Leads)
+                    {
+                        <div class="lead @(lead.Unread ? "unread" : "")">
+                            <span class="lead-av">@lead.Initials</span>
+                            <div class="lead-mid">
+                                <div class="lead-name-row">
+                                    <span class="lead-name">@lead.Name</span>
+                                    @if (lead.Unread)
+                                    {
+                                        <span class="lead-unread"></span>
+                                    }
+                                </div>
+                                <div class="lead-msg">@lead.Message</div>
+                            </div>
+                            <div class="lead-meta">
+                                <span class="lead-via">@Icon(lead.Icon) @lead.Via</span>
+                                <span class="lead-time">@lead.Time</span>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="side-col">
+                <div class="setup-card">
+                    <div class="setup-head">
+                        <span class="setup-title">Finish setting up</span>
+                        <span class="setup-sub">3 of 5 done — you're almost there.</span>
+                    </div>
+                    <div class="setup-track"><span></span></div>
+                    <div class="tasks">
+                        @foreach (var task in SetupTasks)
+                        {
+                            <div class="task">
+                                <span class="task-cb @(task.Done ? "done" : "")">@(task.Done ? Icon("check") : default)</span>
+                                <span class="task-label @(task.Done ? "done" : "")">@task.Label</span>
+                                @if (!task.Done)
+                                {
+                                    <span class="task-arrow">@Icon("chevron-right")</span>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <div class="tip-card">
+                    <span class="tip-ico">@Icon("lightbulb")</span>
+                    <div class="tip-title">Reply to leads within an hour</div>
+                    <div class="tip-body">Businesses that respond quickly win up to 7× more jobs. We'll email you the moment a new lead comes in.</div>
+                    <a class="tip-btn" href="#">@Icon("bell") Notification settings</a>
+                </div>
+            </div>
+        </section>
+    </main>
+</div>
+
+@code {
+    private record NavItem(string Icon, string Label, string Href, bool Active = false, string? Badge = null);
+    private record Stat(string Label, string Value, string Icon, string Note, bool Accent = false);
+    private record Lead(string Initials, string Name, string Message, string Via, string Icon, string Time, bool Unread);
+    private record SetupTask(string Label, bool Done);
+
+    private static readonly NavItem[] Nav =
+    {
+        new("layout-dashboard", "Overview", "/dashboard", Active: true),
+        new("globe", "My site", "#"),
+        new("inbox", "Leads", "#", Badge: "3"),
+        new("chart-column", "Visitors", "#"),
+        new("settings", "Settings", "#"),
+    };
+
+    private static readonly Stat[] Stats =
+    {
+        new("Visitors this week", "1,284", "chart-column", "+18% vs last week", Accent: true),
+        new("Leads", "23", "inbox", "6 new this week", Accent: true),
+        new("Calls tapped", "41", "phone", "Phone & WhatsApp"),
+        new("Avg. time on page", "1m 52s", "clock", "Homepage"),
+    };
+
+    private static readonly Lead[] Leads =
+    {
+        new("AB", "Ama Boateng", "Blocked kitchen drain, need someone today", "Contact form", "phone", "10 min ago", true),
+        new("KM", "Kofi Mensah", "Quote for bathroom pipe replacement", "WhatsApp", "message-circle", "1 hour ago", true),
+        new("ES", "Efua Sarpong", "Water heater leaking, is this urgent?", "Contact form", "phone", "3 hours ago", true),
+        new("YD", "Yaw Darko", "Do you service Tema? Burst pipe outside.", "Call tapped", "phone", "Yesterday", false),
+        new("AN", "Adjoa Nyarko", "Estimate for new sink installation", "Contact form", "phone", "Yesterday", false),
+    };
+
+    private static readonly SetupTask[] SetupTasks =
+    {
+        new("Add your business details", true),
+        new("Publish your site", true),
+        new("Add your services", true),
+        new("Connect a custom domain", false),
+        new("Set up WhatsApp button", false),
+    };
+
+    private static readonly Dictionary<string, string> Icons = new()
+    {
+        ["layout-template"] = "<rect width='18' height='7' x='3' y='3' rx='1'/><rect width='9' height='7' x='3' y='14' rx='1'/><rect width='5' height='7' x='16' y='14' rx='1'/>",
+        ["layout-dashboard"] = "<rect width='7' height='9' x='3' y='3' rx='1'/><rect width='7' height='5' x='14' y='3' rx='1'/><rect width='7' height='9' x='14' y='12' rx='1'/><rect width='7' height='5' x='3' y='16' rx='1'/>",
+        ["globe"] = "<circle cx='12' cy='12' r='10'/><path d='M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20'/><path d='M2 12h20'/>",
+        ["inbox"] = "<polyline points='22 12 16 12 14 15 10 15 8 12 2 12'/><path d='M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z'/>",
+        ["chart-column"] = "<path d='M3 3v16a2 2 0 0 0 2 2h16'/><path d='M18 17V9'/><path d='M13 17V5'/><path d='M8 17v-3'/>",
+        ["settings"] = "<path d='M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z'/><circle cx='12' cy='12' r='3'/>",
+        ["external-link"] = "<path d='M15 3h6v6'/><path d='M10 14 21 3'/><path d='M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6'/>",
+        ["pencil"] = "<path d='M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z'/><path d='m15 5 4 4'/>",
+        ["check"] = "<path d='M20 6 9 17l-5-5'/>",
+        ["link"] = "<path d='M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71'/><path d='M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71'/>",
+        ["phone"] = "<path d='M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384z'/>",
+        ["message-circle"] = "<path d='M7.9 20A9 9 0 1 0 4 16.1L2 22z'/>",
+        ["clock"] = "<circle cx='12' cy='12' r='10'/><path d='M12 6v6l4 2'/>",
+        ["chevron-right"] = "<path d='m9 18 6-6-6-6'/>",
+        ["lightbulb"] = "<path d='M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5'/><path d='M9 18h6'/><path d='M10 22h4'/>",
+        ["bell"] = "<path d='M10.268 21a2 2 0 0 0 3.464 0'/><path d='M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326'/>",
+    };
+
+    private static MarkupString Icon(string name) => new(
+        $"<svg class='icon' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>{Icons[name]}</svg>");
+}
