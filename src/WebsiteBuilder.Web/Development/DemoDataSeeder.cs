@@ -15,6 +15,12 @@ public static class DemoDataSeeder
 {
     public const string DemoSubdomain = "joesplumbing";
 
+    /// <summary>
+    /// The demo owner. Sign in with this address locally — the link is written to the console when
+    /// no SMTP host is configured — and the demo site is waiting on the dashboard.
+    /// </summary>
+    public const string DemoOwnerEmail = "demo@joesplumbing.example";
+
     public static async Task SeedAsync(IServiceProvider services, CancellationToken cancellationToken = default)
     {
         using var scope = services.CreateScope();
@@ -26,7 +32,16 @@ public static class DemoDataSeeder
             return;
         }
 
-        var tenant = new Tenant { Subdomain = DemoSubdomain, Name = "Joe's Plumbing" };
+        // The demo tenant needs an owner or none of the management pages can reach it (WB-15).
+        var owner = await db.Owners.FirstOrDefaultAsync(o => o.Email == DemoOwnerEmail, cancellationToken);
+        if (owner is null)
+        {
+            owner = new Owner { Email = DemoOwnerEmail, Name = "Joe" };
+            db.Owners.Add(owner);
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        var tenant = new Tenant { Subdomain = DemoSubdomain, Name = "Joe's Plumbing", OwnerId = owner.Id };
         db.Tenants.Add(tenant);
         await db.SaveChangesAsync(cancellationToken);
 

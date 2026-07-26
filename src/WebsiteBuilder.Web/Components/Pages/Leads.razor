@@ -1,7 +1,9 @@
 @page "/manage/{SiteId:guid}/leads"
 @using WebsiteBuilder.Core.Entities
+@using WebsiteBuilder.Web.Auth
 @using WebsiteBuilder.Web.Leads
 @using WebsiteBuilder.Web.Management
+@attribute [Authorize]
 @* Prerender off so OnInitializedAsync runs exactly once: it marks leads read, and a
    prerender + circuit double-run would clear the "new" state before this render shows it. *@
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
@@ -117,9 +119,13 @@
     private List<Lead>? _leads;
     private int _newCount;
 
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
     protected override async Task OnInitializedAsync()
     {
-        var managed = await Management.LoadAsync(SiteId);
+        // Leads carry customers' phone numbers and email addresses, so this gate is the one that
+        // matters most on the whole site.
+        var managed = await Management.LoadAsync(SiteId, await AuthState.OwnerIdAsync());
         if (managed is null)
         {
             _notFound = true;

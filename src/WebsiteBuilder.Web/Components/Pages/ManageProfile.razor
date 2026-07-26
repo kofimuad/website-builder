@@ -1,7 +1,9 @@
 @page "/manage/{SiteId:guid}/profile"
 @using WebsiteBuilder.Core.Onboarding
 @using WebsiteBuilder.Core.SiteModel
+@using WebsiteBuilder.Web.Auth
 @using WebsiteBuilder.Web.Management
+@attribute [Authorize]
 @rendermode InteractiveServer
 @inject SiteManagementService Management
 
@@ -92,9 +94,11 @@
         DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday,
     ];
 
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
     protected override async Task OnInitializedAsync()
     {
-        var managed = await Management.LoadAsync(SiteId);
+        var managed = await Management.LoadAsync(SiteId, await AuthState.OwnerIdAsync());
         if (managed is null)
         {
             _notFound = true;

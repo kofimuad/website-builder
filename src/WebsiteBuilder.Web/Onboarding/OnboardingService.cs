@@ -19,12 +19,23 @@ public sealed class OnboardingService(
     ISiteGenerator generator,
     IOptions<TenantResolutionOptions> tenantOptions)
 {
+    /// <summary>
+    /// Creates the tenant, profile and first draft. <paramref name="ownerId"/> is required: a tenant
+    /// created without one would be unreachable the moment it existed, since every management page
+    /// resolves a site through its owner.
+    /// </summary>
     public async Task<OnboardingResult> CompleteAsync(
         BusinessProfile answers,
+        Guid ownerId,
         IProgress<OnboardingProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(answers);
+
+        if (ownerId == Guid.Empty)
+        {
+            throw new ArgumentException("A site must be created for a signed-in owner.", nameof(ownerId));
+        }
 
         progress?.Report(OnboardingProgress.Preparing);
 
@@ -34,7 +45,7 @@ public sealed class OnboardingService(
             (candidate, ct) => db.Tenants.AnyAsync(t => t.Subdomain == candidate, ct),
             cancellationToken);
 
-        var tenant = new Tenant { Subdomain = subdomain, Name = answers.BusinessName };
+        var tenant = new Tenant { Subdomain = subdomain, Name = answers.BusinessName, OwnerId = ownerId };
         db.Tenants.Add(tenant);
         await db.SaveChangesAsync(cancellationToken);
 

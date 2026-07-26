@@ -20,7 +20,7 @@ public sealed class OnboardingWizard
     public static readonly IReadOnlyList<OnboardingStep> Steps = Enum.GetValues<OnboardingStep>();
 
     /// <summary>Answers accumulate in one object, so stepping back never discards them.</summary>
-    public BusinessProfile Answers { get; } = new();
+    public BusinessProfile Answers { get; private set; } = new();
 
     public int CurrentIndex { get; private set; }
 
@@ -96,6 +96,18 @@ public sealed class OnboardingWizard
 
         IsComplete = false;
         CurrentIndex--;
+    }
+
+    /// <summary>
+    /// Reinstates answers captured earlier as a finished interview (WB-15). Used when someone
+    /// completes the questions anonymously and signs in before the site is built — they come back
+    /// to a wizard that is already at the end, not to question one.
+    /// </summary>
+    public void Restore(BusinessProfile answers)
+    {
+        Answers = answers ?? throw new ArgumentNullException(nameof(answers));
+        CurrentIndex = Steps.Count - 1;
+        IsComplete = true;
     }
 
     /// <summary>Drops blank lines the owner left behind while typing.</summary>

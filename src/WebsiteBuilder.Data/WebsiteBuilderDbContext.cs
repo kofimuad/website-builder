@@ -23,6 +23,8 @@ public class WebsiteBuilderDbContext : DbContext
     public DbSet<Site> Sites => Set<Site>();
     public DbSet<BusinessProfile> BusinessProfiles => Set<BusinessProfile>();
     public DbSet<Lead> Leads => Set<Lead>();
+    public DbSet<Owner> Owners => Set<Owner>();
+    public DbSet<SignInToken> SignInTokens => Set<SignInToken>();
 
     private static readonly ValueConverter<SiteDefinition, string> DefinitionConverter = new(
         definition => SiteDefinitionSerializer.Serialize(definition),
@@ -67,6 +69,35 @@ public class WebsiteBuilderDbContext : DbContext
             e.Property(t => t.Subdomain).HasMaxLength(63).IsRequired();
             e.Property(t => t.Name).HasMaxLength(200).IsRequired();
             e.HasIndex(t => t.Subdomain).IsUnique();
+
+            // The dashboard's only query is "tenants for this owner", so the FK is indexed.
+            // Restrict, not Cascade: deleting an owner must never silently take live customer
+            // websites down with it. Detaching or transferring them is a deliberate act.
+            e.HasIndex(t => t.OwnerId);
+            e.HasOne<Owner>().WithMany().HasForeignKey(t => t.OwnerId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Owner>(e =>
+        {
+            e.HasKey(o => o.Id);
+            e.Property(o => o.Email).HasMaxLength(320).IsRequired();
+            e.Property(o => o.Name).HasMaxLength(200);
+            e.Property(o => o.GoogleSubject).HasMaxLength(64);
+            // Email is the identity: Google and magic link for one address must resolve to one row.
+            e.HasIndex(o => o.Email).IsUnique();
+        });
+
+        modelBuilder.Entity<SignInToken>(e =>
+        {
+            e.HasKey(t => t.Id);
+            e.Property(t => t.Email).HasMaxLength(320).IsRequired();
+            e.Property(t => t.TokenHash).HasMaxLength(64).IsRequired();
+            e.Property(t => t.ReturnUrl).HasMaxLength(2048);
+            // Redemption looks a token up by its hash and nothing else; it must be unique so a
+            // hash collision cannot resolve to two rows, and indexed because it is the hot path.
+            e.HasIndex(t => t.TokenHash).IsUnique();
+            // Rate limiting counts recent tokens per address.
+            e.HasIndex(t => new { t.Email, t.CreatedUtc });
         });
 
         modelBuilder.Entity<Site>(e =>

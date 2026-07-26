@@ -1,17 +1,22 @@
 using System.Text.Encodings.Web;
 using System.Text.Unicode;
 using Anthropic;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.EntityFrameworkCore;
 using WebsiteBuilder.Core.Generation;
 using WebsiteBuilder.Core.Tenancy;
 using WebsiteBuilder.Data;
+using WebsiteBuilder.Web.Auth;
 using WebsiteBuilder.Web.Caching;
 using WebsiteBuilder.Web.Components;
 using WebsiteBuilder.Web.Development;
+using WebsiteBuilder.Web.Email;
 using WebsiteBuilder.Web.Generation;
 using WebsiteBuilder.Web.Management;
 using WebsiteBuilder.Web.Middleware;
 using WebsiteBuilder.Web.Onboarding;
+using WebsiteBuilder.Web.Platform;
 using WebsiteBuilder.Web.Publishing;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -45,7 +50,70 @@ builder.Services.AddScoped<SitePublisher>();
 builder.Services.AddScoped<OnboardingService>();
 builder.Services.AddScoped<SiteManagementService>();
 builder.Services.AddScoped<WebsiteBuilder.Web.Leads.LeadsService>();
-builder.Services.AddSingleton<WebsiteBuilder.Web.Leads.ILeadNotifier, WebsiteBuilder.Web.Leads.LogLeadNotifier>();
+// Scoped, not singleton: it resolves the owner to notify through the request's DbContext.
+builder.Services.AddScoped<WebsiteBuilder.Web.Leads.ILeadNotifier, WebsiteBuilder.Web.Leads.EmailLeadNotifier>();
+
+// Sign-in (WB-15) and the transactional email both routes depend on.
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddMemoryCache();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.Configure<PlatformOptions>(builder.Configuration.GetSection(PlatformOptions.SectionName));
+builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection(AuthOptions.SectionName));
+builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection(EmailOptions.SectionName));
+builder.Services.AddScoped<PlatformUrls>();
+builder.Services.AddScoped<OwnerSignInService>();
+builder.Services.AddScoped<OnboardingDraftStore>();
+
+// No SMTP host configured means a developer can still sign in: the link goes to the log.
+var emailOptions = builder.Configuration.GetSection(EmailOptions.SectionName).Get<EmailOptions>() ?? new EmailOptions();
+if (emailOptions.IsConfigured)
+{
+    builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
+}
+else
+{
+    builder.Services.AddScoped<IEmailSender, LogEmailSender>();
+}
+
+var authOptions = builder.Configuration.GetSection(AuthOptions.SectionName).Get<AuthOptions>() ?? new AuthOptions();
+
+var authentication = builder.Services
+    .AddAuthentication(AuthSchemes.Application)
+    .AddCookie(AuthSchemes.Application, options =>
+    {
+        options.LoginPath = AuthEndpoints.SignInPath;
+        options.AccessDeniedPath = AuthEndpoints.SignInPath;
+        options.ExpireTimeSpan = TimeSpan.FromDays(30);
+        options.SlidingExpiration = true;
+        options.Cookie.Name = "sitely_auth";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+    });
+
+// Google is optional in exactly the way Claude is above: configure it and the button appears,
+// leave it out and magic-link sign-in carries the whole flow.
+if (authOptions.IsGoogleConfigured)
+{
+    authentication
+        .AddCookie(AuthSchemes.External, options =>
+        {
+            options.Cookie.Name = "sitely_external";
+            options.ExpireTimeSpan = TimeSpan.FromMinutes(10);
+            options.Cookie.SameSite = SameSiteMode.Lax;
+        })
+        .AddGoogle(options =>
+        {
+            options.ClientId = authOptions.GoogleClientId!;
+            options.ClientSecret = authOptions.GoogleClientSecret!;
+            options.SignInScheme = AuthSchemes.External;
+            options.CallbackPath = "/auth/google-signin";
+            options.SaveTokens = false;
+        });
+}
+
+builder.Services.AddAuthorization();
+builder.Services.AddCascadingAuthenticationState();
 
 // Site generation. The deterministic template always exists; when an Anthropic API key is
 // configured, Claude writes the copy and the template becomes the fallback for when the model
@@ -116,12 +184,16 @@ app.UseRouting();
 // After tenant resolution so the cache key can include the tenant.
 app.UseOutputCache();
 
+app.UseAuthentication();
+app.UseAuthorization();
+
 app.UseAntiforgery();
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 app.MapRazorPages();
+app.MapAuthEndpoints();
 app.MapHealthChecks("/healthz");
 
 app.Run();

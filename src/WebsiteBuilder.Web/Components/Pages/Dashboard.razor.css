@@ -96,6 +96,8 @@
 
 /* ---------- stat cards ---------- */
 .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+/* Three real measures beats four with an invented one; visitor counts arrive with WB-37. */
+.stats.stats-3 { grid-template-columns: repeat(3, 1fr); }
 .stat { display: flex; flex-direction: column; gap: 10px; padding: 18px; border-radius: 14px; background: #fff; border: 1px solid #E7E9E1; }
 .stat-top { display: flex; align-items: center; justify-content: space-between; }
 .stat-label { font-size: 13.5px; color: var(--fg2); }
@@ -115,7 +117,8 @@
 .view-all { font-size: 14px; font-weight: 600; color: var(--accent-strong); }
 
 .table { display: flex; flex-direction: column; }
-.lead { display: flex; align-items: center; gap: 14px; padding: 14px 20px; border-bottom: 1px solid #EEF0EA; }
+.lead { display: flex; align-items: center; gap: 14px; padding: 14px 20px; border-bottom: 1px solid #EEF0EA; color: inherit; }
+.lead:hover { background: var(--tile2); }
 .lead:last-child { border-bottom: none; }
 .lead.unread { background: #F9FBF7; }
 .lead-av {
@@ -140,9 +143,11 @@
 .setup-title { font-family: var(--font-head); font-size: 17px; font-weight: 600; color: var(--fg); }
 .setup-sub { font-size: 13px; color: var(--fg2); }
 .setup-track { height: 6px; border-radius: 9999px; background: #E2E6DB; overflow: hidden; }
-.setup-track > span { display: block; width: 60%; height: 100%; border-radius: 9999px; background: var(--accent); }
+/* Width comes from the real done-count, set inline. */
+.setup-track > span { display: block; height: 100%; border-radius: 9999px; background: var(--accent); transition: width .25s; }
 .tasks { display: flex; flex-direction: column; gap: 2px; }
-.task { display: flex; align-items: center; gap: 11px; padding: 9px 0; }
+.task { display: flex; align-items: center; gap: 11px; padding: 9px 0; color: inherit; }
+.task:hover .task-label { color: var(--accent-strong); }
 .task-cb {
     display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
     width: 22px; height: 22px; border-radius: 9999px;
@@ -163,6 +168,27 @@
 .tip-btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 10px 16px; border-radius: 9999px; background: #22392A; color: #fff; font-size: 13.5px; font-weight: 600; }
 .tip-btn:hover { background: #2A4633; }
 .tip-btn .icon { font-size: 14px; }
+
+/* ---------- states the real data introduces ---------- */
+.loading { color: var(--fg-muted); font-size: 15px; }
+
+.lead-empty { padding: 22px 20px 26px; font-size: 14px; line-height: 1.55; color: var(--fg-muted); }
+
+.status-dot.pending { background: var(--gold); }
+.status-pill.draft { background: #FBF1D8; color: #7A5B00; }
+.status-pill.draft > i { background: var(--gold); }
+
+.signout-form { margin: 0; padding: 0 4px; }
+.signout {
+    padding: 0;
+    font: inherit;
+    font-size: 13px;
+    color: #8CA593;
+    background: none;
+    border: none;
+    cursor: pointer;
+}
+.signout:hover { color: #fff; text-decoration: underline; }
 
 /* ---------- responsive ---------- */
 @media (max-width: 1080px) {

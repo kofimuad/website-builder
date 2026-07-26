@@ -145,8 +145,10 @@ public class OnboardingServiceTests(PostgresFixture fixture) : IDisposable
 
     private async Task<OnboardingResult> CompleteAsync(BusinessProfile answers)
     {
+        var ownerId = await _factory.CreateOwnerAsync();
+
         using var scope = _factory.Services.CreateScope();
-        return await scope.ServiceProvider.GetRequiredService<OnboardingService>().CompleteAsync(answers);
+        return await scope.ServiceProvider.GetRequiredService<OnboardingService>().CompleteAsync(answers, ownerId);
     }
 
     [Fact]

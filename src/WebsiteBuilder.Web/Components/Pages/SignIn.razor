@@ -1,0 +1,129 @@
+@page "/signin"
+@using Microsoft.Extensions.Options
+@using WebsiteBuilder.Web.Auth
+@inject OwnerSignInService SignInService
+@inject IOptions<AuthOptions> AuthOptions
+
+@* Static server rendering on purpose. The form posts a real request, so Blazor handles the
+   antiforgery token for us, and there is no circuit to lose the submitted address to. *@
+
+<PageTitle>Sign in — Sitely</PageTitle>
+
+<div class="signin">
+    <a class="brand" href="/">
+        <span class="brand-mark">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="7" x="3" y="3" rx="1"/><rect width="9" height="7" x="3" y="14" rx="1"/><rect width="5" height="7" x="16" y="14" rx="1"/></svg>
+        </span>
+        Sitely
+    </a>
+
+    <div class="card">
+        @if (_sent)
+        {
+            <h1>Check your email</h1>
+            <p class="lead">
+                We sent a sign-in link to <strong>@Model.Email</strong>. Open it on this device and
+                you're in. The link works once and expires in @($"{SignInTokenLifetimeMinutes:0}") minutes.
+            </p>
+            <p class="fine">
+                Nothing arrived? Check your spam folder, or
+                <a href="@SelfLink">try a different address</a>.
+            </p>
+        }
+        else
+        {
+            <h1>Sign in to Sitely</h1>
+            <p class="lead">We'll email you a link. No password to remember.</p>
+
+            @if (_error is not null)
+            {
+                <div class="alert" role="alert">@_error</div>
+            }
+
+            @if (AuthOptions.Value.IsGoogleConfigured)
+            {
+                <a class="btn-google" href="@GoogleLink">
+                    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5a5.6 5.6 0 0 1-2.4 3.6v3h3.9c2.3-2.1 3.5-5.2 3.5-8.8z"/><path fill="#34A853" d="M12 24c3.2 0 5.9-1.1 7.9-2.9l-3.9-3c-1.1.7-2.4 1.2-4 1.2-3.1 0-5.7-2.1-6.6-4.9H1.4v3.1A12 12 0 0 0 12 24z"/><path fill="#FBBC05" d="M5.4 14.4a7.2 7.2 0 0 1 0-4.6V6.7H1.4a12 12 0 0 0 0 10.8l4-3.1z"/><path fill="#EA4335" d="M12 4.8c1.8 0 3.3.6 4.6 1.8l3.4-3.4A12 12 0 0 0 1.4 6.7l4 3.1C6.3 6.9 8.9 4.8 12 4.8z"/></svg>
+                    Continue with Google
+                </a>
+
+                <div class="divider"><span>or</span></div>
+            }
+
+            <EditForm Model="Model" FormName="signin" OnValidSubmit="SendAsync" method="post">
+                <DataAnnotationsValidator />
+                <label for="email">Your email</label>
+                <InputText id="email" @bind-Value="Model.Email" type="email" autocomplete="email"
+                           placeholder="you@yourbusiness.com" autofocus />
+                <button class="btn-primary" type="submit">Email me a sign-in link</button>
+            </EditForm>
+
+            <p class="fine">
+                New here? Signing in creates your account.
+                <a href="/start">Or build a website first</a>.
+            </p>
+        }
+    </div>
+</div>
+
+@code {
+    /// <summary>Round-trips the typed address across the POST so the confirmation can show it back.</summary>
+    public sealed class SignInModel
+    {
+        public string? Email { get; set; }
+    }
+
+    [SupplyParameterFromForm]
+    private SignInModel Model { get; set; } = new();
+
+    [SupplyParameterFromQuery(Name = "returnUrl")]
+    private string? ReturnUrl { get; set; }
+
+    [SupplyParameterFromQuery(Name = "error")]
+    private string? ErrorCode { get; set; }
+
+    private bool _sent;
+    private string? _error;
+
+    private static double SignInTokenLifetimeMinutes => Core.Entities.SignInToken.Lifetime.TotalMinutes;
+
+    private string SelfLink => AuthEndpoints.SignInPath
+        + (SafeReturn is null ? "" : $"?returnUrl={Uri.EscapeDataString(SafeReturn)}");
+
+    private string GoogleLink => "/auth/google"
+        + (SafeReturn is null ? "" : $"?returnUrl={Uri.EscapeDataString(SafeReturn)}");
+
+    private string? SafeReturn => OwnerSignInService.SafeReturnUrl(ReturnUrl);
+
+    protected override void OnInitialized() => _error = ErrorCode switch
+    {
+        "link" => "That sign-in link has expired or was already used. Enter your email for a fresh one.",
+        "google" => "Google sign-in did not complete. Please try again, or use an email link instead.",
+        "noemail" => "That Google account did not share an email address, so we can't identify you. Try an email link instead.",
+        _ => null,
+    };
+
+    private async Task SendAsync()
+    {
+        var result = await SignInService.SendLinkAsync(Model.Email, SafeReturn);
+
+        switch (result)
+        {
+            case SignInLinkResult.InvalidEmail:
+                _error = "That does not look like an email address. Check it and try again.";
+                return;
+
+            case SignInLinkResult.SendFailed:
+                _error = "We could not send the email just now. Please try again in a moment.";
+                return;
+
+            // A rate-limited address still sees the confirmation. Saying "too many attempts" would
+            // tell an attacker which addresses have accounts; the earlier links still work anyway.
+            case SignInLinkResult.RateLimited:
+            case SignInLinkResult.Sent:
+            default:
+                _sent = true;
+                return;
+        }
+    }
+}

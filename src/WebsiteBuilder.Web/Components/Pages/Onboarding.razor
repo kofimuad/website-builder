@@ -1,8 +1,10 @@
 @page "/start"
 @using WebsiteBuilder.Core.Onboarding
+@using WebsiteBuilder.Web.Auth
 @using WebsiteBuilder.Web.Onboarding
 @rendermode InteractiveServer
 @inject OnboardingService OnboardingService
+@inject OnboardingDraftStore DraftStore
 @inject NavigationManager Navigation
 
 <PageTitle>Let's build your website</PageTitle>
@@ -247,6 +249,36 @@
 
     [Inject] private Microsoft.Extensions.Options.IOptions<Core.Tenancy.TenantResolutionOptions> TenantOptions { get; set; } = default!;
 
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    /// <summary>Set when the visitor is coming back from sign-in with an interview waiting to be built.</summary>
+    [SupplyParameterFromQuery(Name = "claim")]
+    private string? ClaimKey { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (string.IsNullOrEmpty(ClaimKey))
+        {
+            return;
+        }
+
+        var stashed = DraftStore.Take(ClaimKey);
+
+        if (stashed is null)
+        {
+            // The stash expired or was already claimed. Their answers are gone, so the honest
+            // thing is to start them over rather than build something half-remembered.
+            _problem = "That took a little too long, so we didn't keep your answers. It's only a few questions — let's go again.";
+            return;
+        }
+
+        _wizard.Restore(stashed);
+        _offeringsText = string.Join("\n", stashed.Offerings);
+        _addressText = string.Join("\n", stashed.AddressLines);
+
+        await Build();
+    }
+
     private string PlatformSuffix => TenantOptions.Value.PlatformDomain;
 
     private string PreviewUrl => $"/preview/{_result!.SiteId}";
@@ -301,11 +333,38 @@
             return;
         }
 
+        // The interview is deliberately anonymous — asking someone to make an account before they
+        // have seen anything is how you lose them. Sign-in is required only here, at the point
+        // where there is something real to save and a reason to want it.
+        var ownerId = await AuthState.OwnerIdAsync();
+
+        if (ownerId is null)
+        {
+            var key = DraftStore.Stash(_wizard.Answers);
+            var claimUrl = $"/start?claim={key}";
+
+            // forceLoad: sign-in writes a cookie, which needs a real request rather than a
+            // client-side navigation inside this circuit.
+            Navigation.NavigateTo(
+                $"{AuthEndpoints.SignInPath}?returnUrl={Uri.EscapeDataString(claimUrl)}",
+                forceLoad: true);
+            return;
+        }
+
         await Build();
     }
 
     private async Task Build()
     {
+        var ownerId = await AuthState.OwnerIdAsync();
+
+        if (ownerId is null)
+        {
+            // Only reachable if the session ended between finishing the interview and this call.
+            _problem = "Your sign-in expired. Sign in again and we'll build your site.";
+            return;
+        }
+
         _building = true;
         _failed = false;
         _stage = null;
@@ -318,7 +377,7 @@
 
         try
         {
-            _result = await OnboardingService.CompleteAsync(_wizard.Answers, reporter);
+            _result = await OnboardingService.CompleteAsync(_wizard.Answers, ownerId.Value, reporter);
         }
         catch (Exception)
         {

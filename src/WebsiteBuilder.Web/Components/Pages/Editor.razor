@@ -1,7 +1,9 @@
 @page "/manage/{SiteId:guid}/edit"
 @using WebsiteBuilder.Core.Generation
 @using WebsiteBuilder.Core.SiteModel
+@using WebsiteBuilder.Web.Auth
 @using WebsiteBuilder.Web.Management
+@attribute [Authorize]
 @rendermode InteractiveServer
 @implements IDisposable
 @inject SiteManagementService Management
@@ -231,11 +233,14 @@ else
     private string? _aiError;
     private bool _aiBusy;
 
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
     protected override async Task OnInitializedAsync()
     {
         _assistant = Services.GetService<ISectionAssistant>();
 
-        var managed = await Management.LoadAsync(SiteId);
+        // Someone else's site id resolves to null here, exactly like one that does not exist.
+        var managed = await Management.LoadAsync(SiteId, await AuthState.OwnerIdAsync());
         if (managed is null)
         {
             _notFound = true;

@@ -1,0 +1,19 @@
+@using WebsiteBuilder.Web.Auth
+@inject NavigationManager Navigation
+
+@code {
+    /// <summary>
+    /// Sends an anonymous visitor to sign-in, remembering where they were headed. Rendered by
+    /// <c>AuthorizeRouteView</c>'s NotAuthorized slot rather than handled by cookie middleware,
+    /// because an interactive circuit navigating client-side never reaches the middleware.
+    /// </summary>
+    protected override void OnInitialized()
+    {
+        var returnUrl = Navigation.ToBaseRelativePath(Navigation.Uri);
+        var target = $"{AuthEndpoints.SignInPath}?returnUrl={Uri.EscapeDataString("/" + returnUrl)}";
+
+        // forceLoad so the browser makes a real request: the sign-in page needs a live HttpContext
+        // to read the auth cookie the endpoints will write.
+        Navigation.NavigateTo(target, forceLoad: true);
+    }
+}

@@ -101,16 +101,26 @@ public class SiteManagementServiceTests(PostgresFixture fixture) : IDisposable
 
     public void Dispose() => _factory.Dispose();
 
+    /// <summary>The owner every site in this class belongs to; created on first use.</summary>
+    private Guid _ownerId;
+
+    private async Task<Guid> OwnerAsync() =>
+        _ownerId == Guid.Empty ? _ownerId = await _factory.CreateOwnerAsync() : _ownerId;
+
     private async Task<OnboardingResult> OnboardAsync(string name)
     {
+        var ownerId = await OwnerAsync();
+
         using var scope = _factory.Services.CreateScope();
-        return await scope.ServiceProvider.GetRequiredService<OnboardingService>().CompleteAsync(new BusinessProfile
-        {
-            BusinessName = name,
-            Category = "plumber",
-            Offerings = ["Drain clearing"],
-            PhoneNumber = "+233200000000",
-        });
+        return await scope.ServiceProvider.GetRequiredService<OnboardingService>().CompleteAsync(
+            new BusinessProfile
+            {
+                BusinessName = name,
+                Category = "plumber",
+                Offerings = ["Drain clearing"],
+                PhoneNumber = "+233200000000",
+            },
+            ownerId);
     }
 
     [Fact]
@@ -119,7 +129,7 @@ public class SiteManagementServiceTests(PostgresFixture fixture) : IDisposable
         var result = await OnboardAsync($"Load Co {Guid.NewGuid():N}");
 
         using var scope = _factory.Services.CreateScope();
-        var managed = await scope.ServiceProvider.GetRequiredService<SiteManagementService>().LoadAsync(result.SiteId);
+        var managed = await scope.ServiceProvider.GetRequiredService<SiteManagementService>().LoadAsync(result.SiteId, _ownerId);
 
         Assert.NotNull(managed);
         Assert.Equal(result.SiteId, managed!.Site.Id);
@@ -130,7 +140,7 @@ public class SiteManagementServiceTests(PostgresFixture fixture) : IDisposable
     public async Task Loading_an_unknown_site_returns_null()
     {
         using var scope = _factory.Services.CreateScope();
-        var managed = await scope.ServiceProvider.GetRequiredService<SiteManagementService>().LoadAsync(Guid.NewGuid());
+        var managed = await scope.ServiceProvider.GetRequiredService<SiteManagementService>().LoadAsync(Guid.NewGuid(), await OwnerAsync());
 
         Assert.Null(managed);
     }
@@ -153,7 +163,7 @@ public class SiteManagementServiceTests(PostgresFixture fixture) : IDisposable
         using (var scope = _factory.Services.CreateScope())
         {
             var mgmt = scope.ServiceProvider.GetRequiredService<SiteManagementService>();
-            var managed = await mgmt.LoadAsync(result.SiteId);
+            var managed = await mgmt.LoadAsync(result.SiteId, _ownerId);
             managed!.Profile.PhoneNumber = "+233209999999";
             await mgmt.SaveProfileAsync(result.SiteId);
         }
@@ -178,7 +188,7 @@ public class SiteManagementServiceTests(PostgresFixture fixture) : IDisposable
         using (var scope = _factory.Services.CreateScope())
         {
             var mgmt = scope.ServiceProvider.GetRequiredService<SiteManagementService>();
-            var managed = await mgmt.LoadAsync(result.SiteId);
+            var managed = await mgmt.LoadAsync(result.SiteId, _ownerId);
             var hero = managed!.Site.Draft.Sections.OfType<HeroSection>().Single();
             hero.Headline = "Hand-edited headline";
             await mgmt.SaveDraftAsync();
@@ -202,7 +212,7 @@ public class SiteManagementServiceTests(PostgresFixture fixture) : IDisposable
         using (var scope = _factory.Services.CreateScope())
         {
             var mgmt = scope.ServiceProvider.GetRequiredService<SiteManagementService>();
-            var managed = await mgmt.LoadAsync(result.SiteId);
+            var managed = await mgmt.LoadAsync(result.SiteId, _ownerId);
             managed!.Profile.Email = "fresh@example.com";
             await mgmt.SaveProfileAsync(result.SiteId);
             await mgmt.PublishAsync(result.SiteId);
