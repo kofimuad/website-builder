@@ -15,7 +15,7 @@
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
-
+done_new.pen
 # Mono auto generated files
 mono_crash.*
 

@@ -44,6 +44,8 @@ builder.Services.Configure<TenantResolutionOptions>(
 builder.Services.AddScoped<SitePublisher>();
 builder.Services.AddScoped<OnboardingService>();
 builder.Services.AddScoped<SiteManagementService>();
+builder.Services.AddScoped<WebsiteBuilder.Web.Leads.LeadsService>();
+builder.Services.AddSingleton<WebsiteBuilder.Web.Leads.ILeadNotifier, WebsiteBuilder.Web.Leads.LogLeadNotifier>();
 
 // Site generation. The deterministic template always exists; when an Anthropic API key is
 // configured, Claude writes the copy and the template becomes the fallback for when the model

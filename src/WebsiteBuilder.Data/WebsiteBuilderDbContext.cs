@@ -22,6 +22,7 @@ public class WebsiteBuilderDbContext : DbContext
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<Site> Sites => Set<Site>();
     public DbSet<BusinessProfile> BusinessProfiles => Set<BusinessProfile>();
+    public DbSet<Lead> Leads => Set<Lead>();
 
     private static readonly ValueConverter<SiteDefinition, string> DefinitionConverter = new(
         definition => SiteDefinitionSerializer.Serialize(definition),
@@ -98,6 +99,20 @@ public class WebsiteBuilderDbContext : DbContext
             e.HasOne<Tenant>().WithMany().HasForeignKey(p => p.TenantId).OnDelete(DeleteBehavior.Cascade);
         });
 
+        modelBuilder.Entity<Lead>(e =>
+        {
+            e.HasKey(l => l.Id);
+            e.Property(l => l.Name).HasMaxLength(200).IsRequired();
+            e.Property(l => l.PhoneNumber).HasMaxLength(40);
+            e.Property(l => l.Email).HasMaxLength(200);
+            e.Property(l => l.Message).HasMaxLength(4000).IsRequired();
+            e.Property(l => l.Channel).HasConversion<string>().HasMaxLength(32);
+            // The inbox reads a tenant's leads newest-first; index the sort it always uses.
+            e.HasIndex(l => new { l.TenantId, l.CreatedUtc });
+            e.HasOne<Tenant>().WithMany().HasForeignKey(l => l.TenantId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<Site>().WithMany().HasForeignKey(l => l.SiteId).OnDelete(DeleteBehavior.Cascade);
+        });
+
         // Tenant-owned entities are filtered on every query. A null TenantId matches nothing
         // rather than everything, so a missing tenant scope fails closed.
         modelBuilder.Entity<Site>()
@@ -105,6 +120,9 @@ public class WebsiteBuilderDbContext : DbContext
 
         modelBuilder.Entity<BusinessProfile>()
             .HasQueryFilter(p => _tenantContext.TenantId != null && p.TenantId == _tenantContext.TenantId);
+
+        modelBuilder.Entity<Lead>()
+            .HasQueryFilter(l => _tenantContext.TenantId != null && l.TenantId == _tenantContext.TenantId);
 
         base.OnModelCreating(modelBuilder);
     }

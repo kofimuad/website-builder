@@ -1,0 +1,167 @@
+@page "/manage/{SiteId:guid}/leads"
+@using WebsiteBuilder.Core.Entities
+@using WebsiteBuilder.Web.Leads
+@using WebsiteBuilder.Web.Management
+@* Prerender off so OnInitializedAsync runs exactly once: it marks leads read, and a
+   prerender + circuit double-run would clear the "new" state before this render shows it. *@
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@inject SiteManagementService Management
+@inject LeadsService LeadsService
+
+<PageTitle>Your leads</PageTitle>
+
+<div class="leads-page">
+    @if (_notFound)
+    {
+        <div class="empty-shell"><h1>We couldn't find that website</h1></div>
+    }
+    else if (_leads is null)
+    {
+        <div class="empty-shell"><p>Loading…</p></div>
+    }
+    else
+    {
+        <header class="lp-top">
+            <a class="back" href="/manage/@SiteId/edit">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+                Back to editor
+            </a>
+            <a class="brand" href="/">
+                <span class="brand-mark">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="7" x="3" y="3" rx="1"/><rect width="9" height="7" x="3" y="14" rx="1"/><rect width="5" height="7" x="16" y="14" rx="1"/></svg>
+                </span>
+                Sitely
+            </a>
+        </header>
+
+        <div class="lp-body">
+            <div class="lp-head">
+                <div>
+                    <h1>Leads</h1>
+                    <p>Enquiries from your website — call or email them back to win the job.</p>
+                </div>
+                <div class="lp-stats">
+                    <div class="stat">
+                        <span class="stat-value">@_leads.Count</span>
+                        <span class="stat-label">Total</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-value">@_newCount</span>
+                        <span class="stat-label">New</span>
+                    </div>
+                </div>
+            </div>
+
+            @if (_leads.Count == 0)
+            {
+                <div class="lp-card empty">
+                    <span class="empty-ico">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+                    </span>
+                    <h2>No leads yet</h2>
+                    <p>When someone fills in your contact form, taps to call, or messages you on WhatsApp, they'll show up here.</p>
+                    <a class="view-live" href="/manage/@SiteId/edit">Preview your site</a>
+                </div>
+            }
+            else
+            {
+                <div class="lp-card">
+                    <div class="table">
+                        @foreach (var lead in _leads)
+                        {
+                            <div class="lead @(lead.IsRead ? "" : "unread")">
+                                <span class="lead-av">@Initials(lead.Name)</span>
+                                <div class="lead-mid">
+                                    <div class="lead-name-row">
+                                        <span class="lead-name">@lead.Name</span>
+                                        @if (!lead.IsRead)
+                                        {
+                                            <span class="lead-new">New</span>
+                                        }
+                                    </div>
+                                    <div class="lead-msg">@lead.Message</div>
+                                    <div class="lead-contacts">
+                                        @if (!string.IsNullOrWhiteSpace(lead.PhoneNumber))
+                                        {
+                                            <a href="tel:@lead.PhoneNumber">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384z"/></svg>
+                                                @lead.PhoneNumber
+                                            </a>
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(lead.Email))
+                                        {
+                                            <a href="mailto:@lead.Email">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                                                @lead.Email
+                                            </a>
+                                        }
+                                    </div>
+                                </div>
+                                <div class="lead-meta">
+                                    <span class="lead-via">@ChannelLabel(lead.Channel)</span>
+                                    <span class="lead-time">@TimeAgo(lead.CreatedUtc)</span>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid SiteId { get; set; }
+
+    private bool _notFound;
+    private List<Lead>? _leads;
+    private int _newCount;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var managed = await Management.LoadAsync(SiteId);
+        if (managed is null)
+        {
+            _notFound = true;
+            return;
+        }
+
+        _leads = await LeadsService.ListForSiteAsync(SiteId);
+        _newCount = _leads.Count(l => !l.IsRead);
+
+        // Opening the inbox counts as reading. The count above is captured first, so this render
+        // still shows what was new; the next visit will read zero. Runs once (prerender is off).
+        if (_newCount > 0)
+        {
+            await LeadsService.MarkAllReadAsync(SiteId);
+        }
+    }
+
+    private static string Initials(string name)
+    {
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 0) return "?";
+        return parts.Length == 1
+            ? parts[0][..1].ToUpperInvariant()
+            : (parts[0][..1] + parts[^1][..1]).ToUpperInvariant();
+    }
+
+    private static string ChannelLabel(LeadChannel channel) => channel switch
+    {
+        LeadChannel.WhatsApp => "WhatsApp",
+        LeadChannel.Call => "Call tapped",
+        LeadChannel.ContactForm => "Contact form",
+        _ => "Enquiry",
+    };
+
+    private static string TimeAgo(DateTimeOffset when)
+    {
+        var span = DateTimeOffset.UtcNow - when;
+        if (span < TimeSpan.FromMinutes(1)) return "just now";
+        if (span < TimeSpan.FromHours(1)) return $"{(int)span.TotalMinutes} min ago";
+        if (span < TimeSpan.FromDays(1)) return $"{(int)span.TotalHours} hour{(span.TotalHours < 2 ? "" : "s")} ago";
+        if (span < TimeSpan.FromDays(2)) return "Yesterday";
+        if (span < TimeSpan.FromDays(7)) return $"{(int)span.TotalDays} days ago";
+        return when.ToString("d MMM");
+    }
+}
