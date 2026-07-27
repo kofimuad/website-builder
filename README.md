@@ -39,6 +39,24 @@ The demo seeder creates an owner for the demo site so it is reachable from the d
 as `demo@joesplumbing.example` to see it. Tenants created before sign-in existed have no owner and
 cannot be managed by anyone — their published sites still serve normally.
 
+### Local secrets
+
+`appsettings.Development.json` is committed, so keys must not go in it. Use user secrets, which are
+stored per-machine outside the repo and loaded automatically in Development:
+
+```bash
+dotnet user-secrets set "ANTHROPIC_API_KEY" "sk-ant-…"        --project src/WebsiteBuilder.Web
+dotnet user-secrets set "Auth:GoogleClientId" "…"             --project src/WebsiteBuilder.Web
+dotnet user-secrets set "Auth:GoogleClientSecret" "…"         --project src/WebsiteBuilder.Web
+dotnet user-secrets set "Email:SmtpHost" "smtp.resend.com"    --project src/WebsiteBuilder.Web
+dotnet user-secrets list --project src/WebsiteBuilder.Web     # check what is set
+```
+
+With `ANTHROPIC_API_KEY` set, Claude writes the site copy and the deterministic template becomes
+the fallback for when the model fails; the per-section AI assistant in the editor also appears,
+since it only exists when the model does. Without the key everything still works — sites are built
+from the template and the assistant is hidden.
+
 Chrome, Edge and Firefox resolve any `*.localhost` name to 127.0.0.1 on their own. If your browser
 does not, add `127.0.0.1 joesplumbing.localhost` to `C:\Windows\System32\drivers\etc\hosts`.
 

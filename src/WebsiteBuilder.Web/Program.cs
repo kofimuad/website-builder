@@ -123,6 +123,17 @@ builder.Services.AddSingleton<TemplateSiteGenerator>();
 var anthropicKey = builder.Configuration["ANTHROPIC_API_KEY"]
     ?? Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY");
 
+// A key that is present but malformed is worse than none: generation would take the Claude path,
+// fail on every call and land back on the template, and the only symptom is unexpectedly generic
+// copy. Refusing to start beats debugging that later. Blank stays a legitimate "no key".
+if (!string.IsNullOrWhiteSpace(anthropicKey) && !anthropicKey.StartsWith("sk-ant-", StringComparison.Ordinal))
+{
+    throw new InvalidOperationException(
+        "ANTHROPIC_API_KEY does not look like an Anthropic API key (expected it to start with " +
+        "'sk-ant-'). Leave it unset to use the template generator, or set a real key: " +
+        "dotnet user-secrets set \"ANTHROPIC_API_KEY\" \"sk-ant-…\" --project src/WebsiteBuilder.Web");
+}
+
 if (string.IsNullOrWhiteSpace(anthropicKey))
 {
     builder.Services.AddSingleton<ISiteGenerator>(sp => sp.GetRequiredService<TemplateSiteGenerator>());
@@ -153,6 +164,12 @@ builder.Services.AddOutputCache(options =>
     options.AddPolicy(TenantSiteCachePolicy.Name, new TenantSiteCachePolicy()));
 
 var app = builder.Build();
+
+// Which generator is live is otherwise invisible until someone notices the copy reads generically.
+app.Logger.LogInformation(
+    "Site generation: {Generator}. Per-section assistant: {Assistant}.",
+    string.IsNullOrWhiteSpace(anthropicKey) ? "template only" : "Claude, template fallback",
+    string.IsNullOrWhiteSpace(anthropicKey) ? "unavailable" : "available");
 
 // Railway has no separate release phase, so pending migrations are applied on boot.
 if (app.Configuration.GetValue("RunMigrationsOnStartup", true))
