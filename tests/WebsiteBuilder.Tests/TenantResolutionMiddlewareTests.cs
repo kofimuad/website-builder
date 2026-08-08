@@ -23,12 +23,16 @@ public sealed class TenantAppFactory(PostgresFixture fixture) : WebApplicationFa
             ["TenantResolution:PlatformDomain"] = "platform.com",
 
             // Every test that completes onboarding through this host would otherwise make a real,
-            // billed Claude request — the Development environment loads the developer's user
-            // secrets, and ANTHROPIC_API_KEY lives there. Blanking it selects TemplateSiteGenerator,
-            // which is deterministic and free. Nothing is lost: the Claude path is covered by
-            // SiteGenerationTests and SectionAssistantTests with scripted IClaudeJsonCompletion
+            // billed model request — the Development environment loads the developer's user
+            // secrets, and the API key lives there. Blanking it selects TemplateSiteGenerator,
+            // which is deterministic and free. Nothing is lost: the model path is covered by
+            // SiteGenerationTests and SectionAssistantTests with scripted IModelJsonCompletion
             // fakes, which exercise it far more precisely than a live call would.
-            ["ANTHROPIC_API_KEY"] = "",
+            //
+            // Both names, because Program.cs accepts either. Adding a provider here means adding
+            // its key to this list; TestHostGenerationTests is what notices if you forget.
+            ["Gemini:ApiKey"] = "",
+            ["GEMINI_API_KEY"] = "",
         }));
 
         return base.CreateHost(builder);

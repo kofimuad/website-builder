@@ -7,7 +7,7 @@ namespace WebsiteBuilder.Core.Generation;
 /// Builds a site from the profile using fixed copy patterns — no model call, no network, same
 /// output every time. Only the wording is decided here: which sections a page has, in what order,
 /// under what headings, and with which photographs all come from the business category's template
-/// via <see cref="SitePlanBuilder"/>, exactly as they do on the Claude path.
+/// via <see cref="SitePlanBuilder"/>, exactly as they do on the model path.
 /// </summary>
 public sealed class TemplateSiteGenerator : ISiteGenerator
 {
@@ -19,18 +19,27 @@ public sealed class TemplateSiteGenerator : ISiteGenerator
         ArgumentNullException.ThrowIfNull(profile);
 
         progress?.Report(OnboardingProgress.WritingCopy);
-        var meta = BuildMeta(profile);
-        var theme = BuildTheme(profile.Tone);
-
         progress?.Report(OnboardingProgress.BuildingPages);
-        var definition = new SiteDefinition
+
+        return Task.FromResult(Generate(profile));
+    }
+
+    /// <summary>
+    /// The generator without the asynchronous wrapper. There is no I/O here — the async signature
+    /// exists for <see cref="ISiteGenerator"/>, not for this implementation — and the onboarding
+    /// preview needs to rebuild a site on every keystroke, where blocking on a Task would be a
+    /// deadlock waiting to happen inside a Blazor circuit.
+    /// </summary>
+    public SiteDefinition Generate(BusinessProfile profile)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+
+        return new SiteDefinition
         {
-            Meta = meta,
-            Theme = theme,
+            Meta = BuildMeta(profile),
+            Theme = BuildTheme(profile.Tone),
             Sections = SitePlanBuilder.Build(CategoryTemplateCatalog.Match(profile.Category), profile, Copy(profile)),
         };
-
-        return Task.FromResult(definition);
     }
 
     /// <summary>

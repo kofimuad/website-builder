@@ -5,7 +5,8 @@ namespace WebsiteBuilder.Core.Generation;
 
 /// <summary>
 /// The prose a page needs, wherever it came from. The template generator fills this from fixed
-/// patterns and Claude fills it from the model's response; neither decides which sections exist.
+/// patterns and the assembler fills it from the model's response; neither decides which sections
+/// exist.
 /// </summary>
 public sealed record SiteCopy(
     string HeroHeadline,
@@ -57,7 +58,32 @@ public static class SitePlanBuilder
             }
         }
 
+        EnsureUploadedPhotosAreShown(sections, profile);
+
         return sections;
+    }
+
+    /// <summary>
+    /// A consultant's lineup has no gallery, because stock photographs of an office say nothing.
+    /// Photographs the owner took of their own work are a different matter: having asked for them
+    /// and been given them, dropping them on the floor is not an option.
+    /// </summary>
+    private static void EnsureUploadedPhotosAreShown(List<SiteSection> sections, BusinessProfile profile)
+    {
+        if (profile.PhotoUrls.Count == 0 || sections.OfType<GallerySection>().Any())
+        {
+            return;
+        }
+
+        var gallery = new GallerySection
+        {
+            Heading = "Our work",
+            Images = profile.PhotoUrls.Select(url => new GalleryImage { Url = url, AltText = "" }).ToList(),
+        };
+
+        // Ahead of the closing prompt, so the page still ends by asking for the enquiry.
+        var contact = sections.FindIndex(s => s is ContactSection);
+        sections.Insert(contact < 0 ? sections.Count : contact, gallery);
     }
 
     /// <summary>
@@ -78,7 +104,10 @@ public static class SitePlanBuilder
             {
                 Headline = copy.HeroHeadline,
                 Subheadline = copy.HeroSubheadline,
-                ImageUrl = template.HeroPhoto?.CroppedTo(HeroWidth, HeroHeight),
+                // Their first photo above the fold if they gave us one. A real photograph of the
+                // actual shop beats the best stock image on the page a customer sees first.
+                ImageUrl = profile.PhotoUrls.FirstOrDefault()
+                           ?? template.HeroPhoto?.CroppedTo(HeroWidth, HeroHeight),
                 CallToActionLabel = copy.CtaButtonLabel,
                 CallToActionUrl = ContactActions.ResolveUrl(profile),
             },
@@ -105,19 +134,10 @@ public static class SitePlanBuilder
                     .ToList(),
             },
 
-            // Stock photography is the whole reason a gallery can appear at all: at onboarding the
-            // owner has uploaded nothing, so without a fallback the section would be an empty grid.
-            "gallery" => template.Gallery.Count == 0 ? null : new GallerySection
-            {
-                Heading = heading,
-                Images = template.Gallery
-                    .Select(photo => new GalleryImage
-                    {
-                        Url = photo.CroppedTo(GalleryWidth, GalleryHeight),
-                        AltText = photo.AltText,
-                    })
-                    .ToList(),
-            },
+            // The owner's own photos always win. Stock photography exists for the common case
+            // where they have none yet: without it the section would be an empty grid, which is
+            // worse than no gallery at all.
+            "gallery" => Gallery(heading, template, profile),
 
             "hoursMap" => profile.AddressLines.Count == 0 ? null : new HoursMapSection
             {
@@ -144,6 +164,37 @@ public static class SitePlanBuilder
             _ => throw new InvalidOperationException(
                 $"Category template '{template.Id}' asks for section kind '{slot.Kind}', which no " +
                 "generator knows how to build. Add it here or correct the template."),
+        };
+    }
+
+    /// <summary>
+    /// The owner's uploaded photos if they have any, otherwise the category's stock set. Alt text
+    /// is left blank on their own photos: only they know what is in them, and a guess would be
+    /// read aloud to someone using a screen reader as though it were fact.
+    /// </summary>
+    private static GallerySection? Gallery(string heading, CategoryTemplate template, BusinessProfile profile)
+    {
+        if (profile.PhotoUrls.Count > 0)
+        {
+            return new GallerySection
+            {
+                Heading = heading,
+                Images = profile.PhotoUrls
+                    .Select(url => new GalleryImage { Url = url, AltText = "" })
+                    .ToList(),
+            };
+        }
+
+        return template.Gallery.Count == 0 ? null : new GallerySection
+        {
+            Heading = heading,
+            Images = template.Gallery
+                .Select(photo => new GalleryImage
+                {
+                    Url = photo.CroppedTo(GalleryWidth, GalleryHeight),
+                    AltText = photo.AltText,
+                })
+                .ToList(),
         };
     }
 

@@ -45,7 +45,22 @@ public sealed class SmtpEmailSender(IOptions<EmailOptions> options, ILogger<Smtp
             // Never let a mail failure take down the thing that triggered it: a lead must still be
             // saved if the notification bounces, and a sign-in link the user can request again is
             // a better outcome than a 500. The caller decides what to tell the user.
-            logger.LogError(ex, "Failed to send {Subject} to {To}.", message.Subject, message.To);
+            //
+            // The connection details go in the message because this log line is the only evidence
+            // that survives — the user is shown a deliberately vague "try again in a moment", and
+            // System.Net.Mail's own exception text rarely names the host, the port or the sender
+            // that were actually used, which are the three things that are usually wrong.
+            logger.LogError(
+                ex,
+                "Failed to send {Subject} to {To} via {Host}:{Port} (STARTTLS {Tls}) as {From}. SMTP status: {Status}.",
+                message.Subject,
+                message.To,
+                _options.SmtpHost,
+                _options.SmtpPort,
+                _options.UseStartTls,
+                _options.FromAddress,
+                ex is SmtpException smtp ? smtp.StatusCode.ToString() : "none");
+
             throw;
         }
     }

@@ -310,6 +310,61 @@ public class CategorySpecificSiteTests
     }
 
     [Fact]
+    public async Task The_owners_own_photos_replace_the_stock_ones()
+    {
+        var profile = Profile("restaurant");
+        profile.PhotoUrls = ["https://res.cloudinary.com/demo/image/upload/v1/sites/a/photo.jpg"];
+
+        var site = await new TemplateSiteGenerator().GenerateAsync(profile);
+        var gallery = site.Sections.OfType<GallerySection>().Single();
+
+        Assert.Equal(profile.PhotoUrls, gallery.Images.Select(i => i.Url));
+        Assert.DoesNotContain(gallery.Images, image => image.Url.Contains("unsplash"));
+    }
+
+    [Fact]
+    public async Task The_first_uploaded_photo_becomes_the_hero()
+    {
+        var profile = Profile("restaurant");
+        profile.PhotoUrls = ["https://res.cloudinary.com/demo/image/upload/v1/first.jpg", "https://x/second.jpg"];
+
+        var site = await new TemplateSiteGenerator().GenerateAsync(profile);
+
+        Assert.Equal(profile.PhotoUrls[0], site.Sections.OfType<HeroSection>().Single().ImageUrl);
+    }
+
+    [Fact]
+    public async Task A_category_with_no_gallery_still_shows_photos_the_owner_uploaded()
+    {
+        // The consultant lineup has no gallery on purpose. Having asked for photos and been given
+        // them, dropping them would be the worse of the two surprises.
+        var profile = Profile("business consultant");
+        profile.PhotoUrls = ["https://res.cloudinary.com/demo/image/upload/v1/work.jpg"];
+
+        var site = await new TemplateSiteGenerator().GenerateAsync(profile);
+        var sections = site.Sections;
+
+        var gallery = sections.OfType<GallerySection>().Single();
+        Assert.Equal(profile.PhotoUrls, gallery.Images.Select(i => i.Url));
+
+        // Placed before the contact section, so the page still ends by asking for the enquiry.
+        Assert.True(sections.IndexOf(gallery) < sections.FindIndex(s => s is ContactSection));
+    }
+
+    [Fact]
+    public async Task An_owners_photo_carries_no_invented_alt_text()
+    {
+        var profile = Profile("barber");
+        profile.PhotoUrls = ["https://res.cloudinary.com/demo/image/upload/v1/cut.jpg"];
+
+        var site = await new TemplateSiteGenerator().GenerateAsync(profile);
+
+        // Only they know what is in it, and a screen reader would read a guess aloud as fact.
+        Assert.All(site.Sections.OfType<GallerySection>().Single().Images,
+            image => Assert.Equal("", image.AltText));
+    }
+
+    [Fact]
     public async Task The_hero_carries_a_photo_so_the_page_does_not_open_on_flat_colour()
     {
         var site = await Generate("restaurant");
@@ -340,7 +395,7 @@ public class CategorySpecificSiteTests
         var profile = Profile("restaurant");
 
         var fromTemplate = await new TemplateSiteGenerator().GenerateAsync(profile);
-        var fromClaude = SiteContentAssembler.Assemble(new GeneratedSiteContent
+        var fromModel = SiteContentAssembler.Assemble(new GeneratedSiteContent
         {
             HeroHeadline = "Jollof worth the queue",
             HeroSubheadline = "Cooked to order, every day.",
@@ -361,11 +416,11 @@ public class CategorySpecificSiteTests
 
         Assert.Equal(
             fromTemplate.Sections.Select(s => s.GetType().Name),
-            fromClaude.Sections.Select(s => s.GetType().Name));
+            fromModel.Sections.Select(s => s.GetType().Name));
 
         Assert.Equal(
             fromTemplate.Sections.OfType<ServicesSection>().Single().Heading,
-            fromClaude.Sections.OfType<ServicesSection>().Single().Heading);
+            fromModel.Sections.OfType<ServicesSection>().Single().Heading);
     }
 
     [Fact]

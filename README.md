@@ -45,7 +45,7 @@ cannot be managed by anyone — their published sites still serve normally.
 stored per-machine outside the repo and loaded automatically in Development:
 
 ```bash
-dotnet user-secrets set "ANTHROPIC_API_KEY" "sk-ant-…"        --project src/WebsiteBuilder.Web
+dotnet user-secrets set "Gemini:ApiKey" "…"                   --project src/WebsiteBuilder.Web
 dotnet user-secrets set "Auth:GoogleClientId" "…"             --project src/WebsiteBuilder.Web
 dotnet user-secrets set "Auth:GoogleClientSecret" "…"         --project src/WebsiteBuilder.Web
 dotnet user-secrets set "Email:SmtpHost" "smtp.resend.com"    --project src/WebsiteBuilder.Web
@@ -70,10 +70,14 @@ upload — the original is stored once and `ImageDelivery` rewrites the URL for 
 needs. A URL from anywhere else is passed through untouched, so sites built before uploads existed
 keep rendering.
 
-With `ANTHROPIC_API_KEY` set, Claude writes the site copy and the deterministic template becomes
-the fallback for when the model fails; the per-section AI assistant in the editor also appears,
-since it only exists when the model does. Without the key everything still works — sites are built
-from the template and the assistant is hidden.
+With a Gemini API key set, the model writes the site copy and the deterministic template becomes
+the fallback for when it fails; the per-section AI assistant in the editor also appears, since it
+only exists when the model does. Without the key everything still works — sites are built from the
+template and the assistant is hidden. Startup logs which of the two is live.
+
+Get a key from [Google AI Studio](https://aistudio.google.com/apikey). The model id is
+configuration (`Gemini:Model`, default `gemini-3.6-flash`), because Google retires ids on a
+schedule and you should not need a deploy to move to the next one.
 
 Either way the *shape* of the site comes from the business category, not from the model: what the
 owner types on the first onboarding step is matched against `CategoryTemplateCatalog`, which decides
@@ -124,7 +128,8 @@ Deployed on Railway from `main`. The service needs:
 | `Images__ApiSecret`                  | Uploads are signed with this server-side — it must never reach the browser |
 | `Auth__GoogleClientId`               | Optional. Both Google variables must be set for the button to appear |
 | `Auth__GoogleClientSecret`           | Optional                                                      |
-| `ANTHROPIC_API_KEY`                  | Optional. Without it, sites use the deterministic template generator |
+| `Gemini__ApiKey` / `GEMINI_API_KEY`  | Optional. Without it, sites use the deterministic template generator |
+| `Gemini__Model`                      | Optional. Defaults to `gemini-3.6-flash` |
 
 A blank `DATABASE_URL` is treated as missing: an unresolved Railway variable reference arrives as
 an empty string rather than being absent.

@@ -89,6 +89,25 @@ textarea.field { resize: vertical; line-height: 1.5; }
 
 .labelled { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: var(--fg2); }
 
+/* ---------- photos ---------- */
+.shots { display: flex; flex-wrap: wrap; gap: 12px; }
+.shot { position: relative; width: 120px; }
+.shot img { width: 120px; height: 84px; object-fit: cover; border-radius: 10px; display: block; }
+.shot-drop {
+    position: absolute; top: 5px; right: 5px;
+    padding: 3px 8px; border-radius: 9999px; border: 0;
+    background: rgba(16, 24, 20, .78); color: #fff;
+    font-family: var(--font-body); font-size: 11px; cursor: pointer;
+}
+.upload {
+    display: inline-flex; align-items: center; gap: 10px; align-self: flex-start;
+    padding: 11px 18px; border-radius: 9999px;
+    background: var(--tile2); border: 1px solid #D6DECB;
+    font-size: 14px; color: var(--fg2); cursor: pointer;
+}
+/* The native control is unstyleable and says "No file chosen"; the label carries the wording. */
+.upload input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+
 .chips-label { margin: 2px 0 0; font-size: 13px; color: var(--fg-muted); }
 .chips { display: flex; flex-wrap: wrap; gap: 10px; }
 .chip {
@@ -187,7 +206,10 @@ textarea.field { resize: vertical; line-height: 1.5; }
 .mini-cta { display: flex; gap: 10px; margin-top: 6px; }
 .mini-primary { padding: 11px 20px; border-radius: 9999px; background: var(--accent); color: #fff; font-size: 13px; font-weight: 600; }
 .mini-secondary { padding: 11px 20px; border-radius: 9999px; border: 1px solid var(--line); color: var(--fg); font-size: 13px; font-weight: 600; }
-.mini-strip { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; }
+/* The category's stock photograph, at the shape the real hero band uses. Cropped by the CDN, so
+   the preview is showing the same file the built site will serve. */
+.mini-shot { display: block; width: 100%; height: 150px; object-fit: cover; }
+.mini-strip { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; padding: 18px 22px; }
 .mini-feat { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--fg2); }
 .mini-feat svg { font-size: 15px; color: var(--accent); }
 

@@ -7,17 +7,14 @@ using WebsiteBuilder.Core.SiteModel;
 namespace WebsiteBuilder.Core.Generation;
 
 /// <summary>
-/// Claude-backed section reviser. It sends only the selected section's text fields plus the
+/// Model-backed section reviser. It sends only the selected section's text fields plus the
 /// owner's instruction, and applies the returned revisions back onto a copy of that section —
 /// so structure, ids, URLs, times, and every other section are untouched by construction.
 /// </summary>
-public sealed class ClaudeSectionAssistant(
-    IClaudeJsonCompletion completion,
-    ILogger<ClaudeSectionAssistant> logger) : ISectionAssistant
+public sealed class ModelSectionAssistant(
+    IModelJsonCompletion completion,
+    ILogger<ModelSectionAssistant> logger) : ISectionAssistant
 {
-    private const decimal InputPricePerMillion = 5.00m;
-    private const decimal OutputPricePerMillion = 25.00m;
-
     private const string System =
         """
         You are helping a small-business owner edit one section of their website. You are given the
@@ -116,14 +113,10 @@ public sealed class ClaudeSectionAssistant(
         return envelope?.Revisions ?? [];
     }
 
-    private void LogCost(ClaudeCompletionResult result)
-    {
-        var cost = result.InputTokens / 1_000_000m * InputPricePerMillion
-                   + result.OutputTokens / 1_000_000m * OutputPricePerMillion;
+    private void LogCost(ModelCompletionResult result) =>
         logger.LogInformation(
             "Section assistant request: {InputTokens} in + {OutputTokens} out tokens, ~${Cost} (USD).",
-            result.InputTokens, result.OutputTokens, cost.ToString("0.0000"));
-    }
+            result.InputTokens, result.OutputTokens, result.EstimatedCostUsd.ToString("0.0000"));
 
     private sealed record RevisionEnvelope(List<SectionTextField> Revisions);
 }

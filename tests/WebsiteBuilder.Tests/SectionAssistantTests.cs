@@ -65,22 +65,22 @@ public class SectionTextTests
     }
 }
 
-public class ClaudeSectionAssistantTests
+public class ModelSectionAssistantTests
 {
-    private sealed class FakeCompletion(string json) : IClaudeJsonCompletion
+    private sealed class FakeCompletion(string json) : IModelJsonCompletion
     {
         public string? LastUser { get; private set; }
 
-        public Task<ClaudeCompletionResult> CompleteAsync(
+        public Task<ModelCompletionResult> CompleteAsync(
             string system, string user, IReadOnlyDictionary<string, JsonElement> schema, CancellationToken ct)
         {
             LastUser = user;
-            return Task.FromResult(new ClaudeCompletionResult(json, 300, 80));
+            return Task.FromResult(new ModelCompletionResult(json, 300, 80, 0.0011m));
         }
     }
 
-    private static ClaudeSectionAssistant Assistant(IClaudeJsonCompletion completion) =>
-        new(completion, NullLogger<ClaudeSectionAssistant>.Instance);
+    private static ModelSectionAssistant Assistant(IModelJsonCompletion completion) =>
+        new(completion, NullLogger<ModelSectionAssistant>.Instance);
 
     [Fact]
     public async Task It_applies_the_revision_and_keeps_type_and_id()

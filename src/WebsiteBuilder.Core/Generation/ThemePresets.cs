@@ -5,7 +5,7 @@ namespace WebsiteBuilder.Core.Generation;
 
 /// <summary>
 /// The curated look for each business tone. Kept in one place so the template generator, the
-/// Claude generator, and (later) the palette picker all share the same WCAG-safe combinations.
+/// model generator, and (later) the palette picker all share the same WCAG-safe combinations.
 /// </summary>
 public static class ThemePresets
 {

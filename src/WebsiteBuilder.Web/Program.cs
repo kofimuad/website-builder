@@ -1,9 +1,9 @@
 using System.Text.Encodings.Web;
 using System.Text.Unicode;
-using Anthropic;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using WebsiteBuilder.Core.Generation;
 using WebsiteBuilder.Core.Tenancy;
 using WebsiteBuilder.Data;
@@ -135,7 +135,7 @@ var authentication = builder.Services
         options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
     });
 
-// Google is optional in exactly the way Claude is above: configure it and the button appears,
+// Google sign-in is optional in exactly the way the model is below: configure it and the button appears,
 // leave it out and magic-link sign-in carries the whole flow.
 if (authOptions.IsGoogleConfigured)
 {
@@ -159,41 +159,49 @@ if (authOptions.IsGoogleConfigured)
 builder.Services.AddAuthorization();
 builder.Services.AddCascadingAuthenticationState();
 
-// Site generation. The deterministic template always exists; when an Anthropic API key is
-// configured, Claude writes the copy and the template becomes the fallback for when the model
-// fails or is unavailable.
+// Site generation. The deterministic template always exists; when a Gemini API key is configured,
+// the model writes the copy and the template becomes the fallback for when it fails or is
+// unavailable.
 builder.Services.AddSingleton<TemplateSiteGenerator>();
 
-var anthropicKey = builder.Configuration["ANTHROPIC_API_KEY"]
-    ?? Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY");
+builder.Services.Configure<GeminiOptions>(builder.Configuration.GetSection(GeminiOptions.SectionName));
 
-// A key that is present but malformed is worse than none: generation would take the Claude path,
-// fail on every call and land back on the template, and the only symptom is unexpectedly generic
-// copy. Refusing to start beats debugging that later. Blank stays a legitimate "no key".
-if (!string.IsNullOrWhiteSpace(anthropicKey) && !anthropicKey.StartsWith("sk-ant-", StringComparison.Ordinal))
-{
-    throw new InvalidOperationException(
-        "ANTHROPIC_API_KEY does not look like an Anthropic API key (expected it to start with " +
-        "'sk-ant-'). Leave it unset to use the template generator, or set a real key: " +
-        "dotnet user-secrets set \"ANTHROPIC_API_KEY\" \"sk-ant-…\" --project src/WebsiteBuilder.Web");
-}
+// GEMINI_API_KEY is the name every Google example uses and the one someone will reach for on
+// Railway; Gemini:ApiKey is the name the rest of this app's configuration would suggest. Accept
+// both rather than make anyone guess, preferring the explicit section.
+var geminiKey = builder.Configuration[$"{GeminiOptions.SectionName}:ApiKey"]
+    ?? builder.Configuration["GEMINI_API_KEY"]
+    ?? Environment.GetEnvironmentVariable("GEMINI_API_KEY");
 
-if (string.IsNullOrWhiteSpace(anthropicKey))
+if (string.IsNullOrWhiteSpace(geminiKey))
 {
     builder.Services.AddSingleton<ISiteGenerator>(sp => sp.GetRequiredService<TemplateSiteGenerator>());
 }
 else
 {
-    builder.Services.AddSingleton(new AnthropicClient { ApiKey = anthropicKey });
-    builder.Services.AddSingleton<IClaudeJsonCompletion, AnthropicClaudeCompletion>();
-    builder.Services.AddSingleton<ClaudeSiteGenerator>();
+    builder.Services.Configure<GeminiOptions>(o => o.ApiKey = geminiKey);
+
+    builder.Services.AddHttpClient<IModelJsonCompletion, GeminiJsonCompletion>((sp, client) =>
+    {
+        var gemini = sp.GetRequiredService<IOptions<GeminiOptions>>().Value;
+
+        client.BaseAddress = new Uri(gemini.BaseUrl);
+        // The header form keeps the key out of request URLs, which is where it would otherwise end
+        // up in every proxy and access log between here and Google.
+        client.DefaultRequestHeaders.Add("x-goog-api-key", gemini.ApiKey);
+        // Generation is a foreground step in onboarding with a person watching a spinner. The
+        // default 100 seconds is far longer than anyone will wait.
+        client.Timeout = TimeSpan.FromSeconds(60);
+    });
+
+    builder.Services.AddSingleton<ModelSiteGenerator>();
     builder.Services.AddSingleton<ISiteGenerator>(sp => new FallbackSiteGenerator(
-        primary: sp.GetRequiredService<ClaudeSiteGenerator>(),
+        primary: sp.GetRequiredService<ModelSiteGenerator>(),
         fallback: sp.GetRequiredService<TemplateSiteGenerator>(),
         logger: sp.GetRequiredService<ILogger<FallbackSiteGenerator>>()));
 
     // The per-section assistant needs the model, so it exists only when the key does.
-    builder.Services.AddSingleton<ISectionAssistant, ClaudeSectionAssistant>();
+    builder.Services.AddSingleton<ISectionAssistant, ModelSectionAssistant>();
 }
 
 // Usage gate for the assistant; harmless when the assistant isn't available.
@@ -220,8 +228,10 @@ app.Logger.LogInformation(
     emailOptions.IsConfigured
         ? $"sending via {emailOptions.SmtpHost} as {emailOptions.FromAddress}"
         : "WRITTEN TO THIS LOG, NOT SENT — no Email:SmtpHost configured",
-    string.IsNullOrWhiteSpace(anthropicKey) ? "template only" : "Claude, template fallback",
-    string.IsNullOrWhiteSpace(anthropicKey) ? "unavailable" : "available",
+    string.IsNullOrWhiteSpace(geminiKey)
+        ? "template only — no Gemini:ApiKey / GEMINI_API_KEY configured"
+        : $"Gemini ({builder.Configuration[$"{GeminiOptions.SectionName}:Model"] ?? new GeminiOptions().Model}), template fallback",
+    string.IsNullOrWhiteSpace(geminiKey) ? "unavailable" : "available",
     imageOptions.IsConfigured ? $"Cloudinary ({imageOptions.CloudName})" : "unavailable");
 
 // Deployed with the default, every real host classifies as an unmapped custom domain and the whole
@@ -233,6 +243,17 @@ if (!app.Environment.IsDevelopment() && tenantOptions.PlatformDomain is "localho
         "TenantResolution:PlatformDomain is still \"localhost\" outside Development. Every request " +
         "to a real host name will 404 as an unmapped custom domain. Set it to the domain tenant " +
         "subdomains hang off, e.g. TenantResolution__PlatformDomain=csbuild.app.");
+}
+
+// Outside Development, no SMTP host means nobody can sign in and no owner hears about a lead —
+// and the visible symptom is a confirmation screen followed by an email that never arrives. It is
+// not fatal (tenant sites keep serving), so this shouts rather than throws.
+if (!app.Environment.IsDevelopment() && !emailOptions.IsConfigured)
+{
+    app.Logger.LogError(
+        "NO EMAIL PROVIDER CONFIGURED. Sign-in links and lead notifications are being written to " +
+        "this log instead of being sent. Set Email__SmtpHost, Email__SmtpPort (587), " +
+        "Email__SmtpUser, Email__SmtpPassword and Email__FromAddress.");
 }
 
 // Railway has no separate release phase, so pending migrations are applied on boot.

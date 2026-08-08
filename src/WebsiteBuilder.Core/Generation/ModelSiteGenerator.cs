@@ -6,18 +6,15 @@ using WebsiteBuilder.Core.SiteModel;
 namespace WebsiteBuilder.Core.Generation;
 
 /// <summary>
-/// Generates a site by asking Claude for the copy, validating the result against the schema and
-/// the fact guard, and retrying with corrective feedback when either fails. Throws when it cannot
-/// produce clean output; a wrapper (see FallbackSiteGenerator) turns that into the template site.
+/// Generates a site by asking a language model for the copy, validating the result against the
+/// schema and the fact guard, and retrying with corrective feedback when either fails. Throws when
+/// it cannot produce clean output; a wrapper (see FallbackSiteGenerator) turns that into the
+/// template site.
 /// </summary>
-public sealed class ClaudeSiteGenerator(
-    IClaudeJsonCompletion completion,
-    ILogger<ClaudeSiteGenerator> logger) : ISiteGenerator
+public sealed class ModelSiteGenerator(
+    IModelJsonCompletion completion,
+    ILogger<ModelSiteGenerator> logger) : ISiteGenerator
 {
-    // Claude Opus 4.8 list pricing, US dollars per million tokens.
-    private const decimal InputPricePerMillion = 5.00m;
-    private const decimal OutputPricePerMillion = 25.00m;
-
     private const int MaxAttempts = 3;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -77,18 +74,14 @@ public sealed class ClaudeSiteGenerator(
         }
 
         throw new SiteGenerationException(
-            $"Claude did not produce clean site copy for '{profile.BusinessName}' after {MaxAttempts} attempts.");
+            $"The model did not produce clean site copy for '{profile.BusinessName}' after {MaxAttempts} attempts.");
     }
 
-    private void LogCost(BusinessProfile profile, int attempt, ClaudeCompletionResult result)
-    {
-        var cost = result.InputTokens / 1_000_000m * InputPricePerMillion
-                   + result.OutputTokens / 1_000_000m * OutputPricePerMillion;
-
+    private void LogCost(BusinessProfile profile, int attempt, ModelCompletionResult result) =>
         logger.LogInformation(
             "Site generation for {Business} attempt {Attempt}: {InputTokens} in + {OutputTokens} out tokens, ~${Cost} (USD).",
-            profile.BusinessName, attempt, result.InputTokens, result.OutputTokens, cost.ToString("0.0000"));
-    }
+            profile.BusinessName, attempt, result.InputTokens, result.OutputTokens,
+            result.EstimatedCostUsd.ToString("0.0000"));
 }
 
 public sealed class SiteGenerationException(string message) : Exception(message);

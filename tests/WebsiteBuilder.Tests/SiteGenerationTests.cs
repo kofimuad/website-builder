@@ -220,27 +220,27 @@ public class GeneratedContentGuardTests
     }
 }
 
-public class ClaudeSiteGeneratorTests
+public class ModelSiteGeneratorTests
 {
-    private sealed class ScriptedCompletion(params string[] responses) : IClaudeJsonCompletion
+    private sealed class ScriptedCompletion(params string[] responses) : IModelJsonCompletion
     {
         private int _index;
         public int Calls { get; private set; }
         public List<string> Prompts { get; } = [];
 
-        public Task<ClaudeCompletionResult> CompleteAsync(
+        public Task<ModelCompletionResult> CompleteAsync(
             string system, string user, IReadOnlyDictionary<string, JsonElement> schema, CancellationToken ct)
         {
             Calls++;
             Prompts.Add(user);
             var json = responses[Math.Min(_index++, responses.Length - 1)];
-            return Task.FromResult(new ClaudeCompletionResult(json, 1200, 400));
+            return Task.FromResult(new ModelCompletionResult(json, 1200, 400, 0.0048m));
         }
     }
 
-    private sealed class ThrowingCompletion : IClaudeJsonCompletion
+    private sealed class ThrowingCompletion : IModelJsonCompletion
     {
-        public Task<ClaudeCompletionResult> CompleteAsync(
+        public Task<ModelCompletionResult> CompleteAsync(
             string system, string user, IReadOnlyDictionary<string, JsonElement> schema, CancellationToken ct)
         {
             ct.ThrowIfCancellationRequested();
@@ -290,8 +290,8 @@ public class ClaudeSiteGeneratorTests
         }
         """;
 
-    private static ClaudeSiteGenerator Generator(IClaudeJsonCompletion completion) =>
-        new(completion, NullLogger<ClaudeSiteGenerator>.Instance);
+    private static ModelSiteGenerator Generator(IModelJsonCompletion completion) =>
+        new(completion, NullLogger<ModelSiteGenerator>.Instance);
 
     [Fact]
     public async Task A_clean_response_produces_a_site()
@@ -337,7 +337,7 @@ public class ClaudeSiteGeneratorTests
     }
 
     [Fact]
-    public async Task The_fallback_generator_uses_the_template_when_claude_fails()
+    public async Task The_fallback_generator_uses_the_template_when_the_model_fails()
     {
         var fallback = new FallbackSiteGenerator(
             primary: Generator(new ThrowingCompletion()),

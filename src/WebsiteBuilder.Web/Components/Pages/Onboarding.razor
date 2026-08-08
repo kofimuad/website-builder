@@ -1,9 +1,12 @@
 @page "/start"
 @using WebsiteBuilder.Core.Generation
 @using WebsiteBuilder.Core.Onboarding
+@using WebsiteBuilder.Core.SiteModel
+@using WebsiteBuilder.Web.Images
 @using WebsiteBuilder.Web.Auth
 @using WebsiteBuilder.Web.Onboarding
 @rendermode InteractiveServer
+@inject IServiceProvider Services
 @inject OnboardingService OnboardingService
 @inject OnboardingDraftStore DraftStore
 @inject NavigationManager Navigation
@@ -143,7 +146,31 @@
                     case OnboardingStep.Photos:
                         <h1>Got photos of your work?</h1>
                         <p class="hint">You can add these later &mdash; your website will look good without them.</p>
-                        <p class="note">Photo uploads are coming soon. Skip for now and we'll build your site without them.</p>
+                        @if (Images is null)
+                        {
+                            <p class="note">Photo uploads aren't switched on yet. Skip for now &mdash; we'll use pictures that suit your kind of business, and you can swap them for your own later.</p>
+                        }
+                        else
+                        {
+                            <div class="shots">
+                                @foreach (var url in _wizard.Answers.PhotoUrls)
+                                {
+                                    <div class="shot">
+                                        <img src="@ImageDelivery.Cropped(url, 360, 240)" alt="" />
+                                        <button type="button" class="shot-drop" @onclick="() => RemovePhoto(url)">Remove</button>
+                                    </div>
+                                }
+                            </div>
+                            <label class="upload">
+                                <InputFile OnChange="AddPhotosAsync" multiple accept="image/*" disabled="@_uploading" />
+                                <span>@(_uploading ? "Uploading…" : "Choose photos")</span>
+                            </label>
+                            <p class="hint">Up to @MaxPhotos photos, @(Images.MaxBytes / (1024 * 1024)) MB each. The first one goes at the top of your site.</p>
+                            @if (_photoProblem is not null)
+                            {
+                                <p class="problem" role="alert">@_photoProblem</p>
+                            }
+                        }
                         break;
 
                     case OnboardingStep.Contact:
@@ -198,6 +225,14 @@
                 </div>
             </div>
 
+            @{
+                // The preview is the real generator run against the answers so far, not a mock:
+                // whatever it shows is what pressing "Build my website" would produce, give or take
+                // the model's wording. Rebuilt each render — it is pure string work, no I/O.
+                var profile = PreviewProfile;
+                var preview = PreviewSiteFor(profile);
+                var previewHero = preview.Sections.OfType<HeroSection>().FirstOrDefault();
+            }
             <aside class="preview-panel">
                 <div class="preview-head">
                     <span class="preview-label">
@@ -211,25 +246,46 @@
                         <span class="dots"><i></i><i></i><i></i></span>
                         <span class="addr">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                            @(PreviewSubdomain).@PlatformSuffix
+                            @SubdomainSuggester.Slugify(profile.BusinessName).@PlatformSuffix
                         </span>
                     </div>
-                    <div class="mini-page">
+                    <div class="mini-page" style="--accent:@preview.Theme.Palette.Primary">
                         <div class="mini-nav">
-                            <span class="mini-brand">@PreviewBrand</span>
-                            <span class="mini-links"><span>Services</span><span>About</span><span>Contact</span></span>
-                            <span class="mini-call">Call now</span>
+                            <span class="mini-brand">@preview.Meta.BusinessName</span>
+                            <span class="mini-links">
+                                @foreach (var link in PreviewNavLinks(preview))
+                                {
+                                    <span>@link</span>
+                                }
+                            </span>
+                            <span class="mini-call">@ContactActions.DefaultLabel(profile.PrimaryAction)</span>
                         </div>
                         <div class="mini-hero">
-                            <span class="mini-eyebrow">Same-day plumbing · Accra</span>
-                            <div class="mini-head">Blocked drain? We come today.</div>
-                            <div class="mini-sub">Family-run plumbers serving Accra since 1996. No callout fee, honest pricing, work done right the first time.</div>
-                            <div class="mini-cta"><span class="mini-primary">Get a free quote</span><span class="mini-secondary">WhatsApp us</span></div>
+                            @if (!string.IsNullOrWhiteSpace(preview.Meta.Tagline))
+                            {
+                                <span class="mini-eyebrow">@preview.Meta.Tagline</span>
+                            }
+                            <div class="mini-head">@previewHero?.Headline</div>
+                            <div class="mini-sub">@previewHero?.Subheadline</div>
+                            <div class="mini-cta">
+                                <span class="mini-primary">@previewHero?.CallToActionLabel</span>
+                                @if (!string.IsNullOrWhiteSpace(profile.WhatsAppNumber))
+                                {
+                                    <span class="mini-secondary">WhatsApp us</span>
+                                }
+                            </div>
                         </div>
+                        @if (!string.IsNullOrWhiteSpace(previewHero?.ImageUrl))
+                        {
+                            <img class="mini-shot" src="@previewHero.ImageUrl" alt="" />
+                        }
                         <div class="mini-strip">
-                            <span class="mini-feat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>Same-day service</span>
-                            <span class="mini-feat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>5-year guarantee</span>
-                            <span class="mini-feat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>No callout fee</span>
+                            @foreach (var offering in profile.Offerings.Take(3))
+                            {
+                                <span class="mini-feat">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>@offering
+                                </span>
+                            }
                         </div>
                     </div>
                 </div>
@@ -243,7 +299,25 @@
     private string _offeringsText = "";
     private string _addressText = "";
     private string? _problem;
+    private string? _photoProblem;
+    private bool _uploading;
     private bool _building;
+
+    private const int MaxPhotos = 6;
+
+    /// <summary>
+    /// Null when no photo provider is configured, in which case the step says so rather than
+    /// offering a button that cannot work — the same rule the editor follows. Resolved from the
+    /// provider rather than injected, because [Inject] throws on a service that isn't registered.
+    /// </summary>
+    private IImageStore? Images { get; set; }
+
+    /// <summary>
+    /// Onboarding has no tenant yet: the tenant is created at the end, from these answers. Uploads
+    /// therefore land in a folder keyed by this interview, and stay there — moving them afterwards
+    /// would buy tidier folder names at the price of rewriting URLs already saved in a site.
+    /// </summary>
+    private readonly Guid _uploadScope = Guid.NewGuid();
     private bool _failed;
     private OnboardingProgress? _stage;
     private OnboardingResult? _result;
@@ -258,6 +332,8 @@
 
     protected override async Task OnInitializedAsync()
     {
+        Images = Services.GetService<IImageStore>();
+
         if (string.IsNullOrEmpty(ClaimKey))
         {
             return;
@@ -295,23 +371,129 @@
     // guess our wording.
     private static IReadOnlyList<string> CategorySuggestions => CategoryTemplateCatalog.Examples;
 
-    private string PreviewBrand => string.IsNullOrWhiteSpace(_wizard.Answers.BusinessName)
-        ? "Rapid Flow Plumbing"
-        : _wizard.Answers.BusinessName;
+    private static readonly TemplateSiteGenerator PreviewGenerator = new();
 
-    private string PreviewSubdomain
+    /// <summary>
+    /// The answers so far, with an example standing in for anything not yet given. The example is
+    /// what makes the first screen look like a website rather than an empty box; each answer
+    /// replaces its part of it, which is the whole promise of "building your site as we talk".
+    /// </summary>
+    private BusinessProfile PreviewProfile
     {
         get
         {
-            var name = _wizard.Answers.BusinessName;
-            if (string.IsNullOrWhiteSpace(name))
-            {
-                return "rapidflow";
-            }
+            var answers = _wizard.Answers;
 
-            var slug = new string(name.ToLowerInvariant().Where(char.IsLetterOrDigit).ToArray());
-            return string.IsNullOrEmpty(slug) ? "rapidflow" : slug;
+            // Read the text areas directly. Their contents only reach Answers on Next/Back, and a
+            // preview that ignored what is on screen right now would be the bug this replaced.
+            var offerings = SplitLines(_offeringsText);
+            var address = SplitLines(_addressText);
+
+            return new BusinessProfile
+            {
+                BusinessName = Or(answers.BusinessName, "Rapid Flow Plumbing"),
+                Category = Or(answers.Category, "plumber"),
+                Offerings = offerings.Count > 0 ? offerings : ["Drain clearing", "Leak repair", "Bathroom fitting"],
+                Tone = answers.Tone,
+                PrimaryAction = answers.PrimaryAction,
+                PhoneNumber = answers.PhoneNumber,
+                WhatsAppNumber = answers.WhatsAppNumber,
+                Email = answers.Email,
+                ServiceArea = answers.ServiceArea,
+                AddressLines = address,
+            };
         }
+    }
+
+    private static SiteDefinition PreviewSiteFor(BusinessProfile profile) => PreviewGenerator.Generate(profile);
+
+    /// <summary>
+    /// The headings of the sections the site will actually have, which is how the owner sees that
+    /// a restaurant gets a menu and a plumber gets services.
+    /// </summary>
+    private static IEnumerable<string> PreviewNavLinks(SiteDefinition site) => site.Sections
+        .Select(section => section switch
+        {
+            ServicesSection services => services.Heading,
+            // "About Joe's Plumbing" is the right heading on the page and far too long in a nav
+            // bar, where every other item is two words.
+            AboutSection about => about.Heading.Contains(site.Meta.BusinessName, StringComparison.OrdinalIgnoreCase)
+                ? "About"
+                : about.Heading,
+            GallerySection gallery => gallery.Heading,
+            ContactSection contact => contact.Heading,
+            _ => null,
+        })
+        .OfType<string>()
+        .Where(heading => !string.IsNullOrWhiteSpace(heading))
+        .Take(3);
+
+    private static string Or(string? value, string fallback) =>
+        string.IsNullOrWhiteSpace(value) ? fallback : value;
+
+    /// <summary>
+    /// Uploads a selection one photo at a time. A file that is too large or that the provider
+    /// rejects is counted and skipped rather than failing the batch: losing four good photos of
+    /// someone's shop over a fifth bad one is the wrong trade.
+    /// </summary>
+    private async Task AddPhotosAsync(InputFileChangeEventArgs e)
+    {
+        if (Images is null)
+        {
+            return;
+        }
+
+        _uploading = true;
+        _photoProblem = null;
+
+        var room = MaxPhotos - _wizard.Answers.PhotoUrls.Count;
+        var rejected = 0;
+
+        try
+        {
+            foreach (var file in e.GetMultipleFiles(MaxPhotos).Take(Math.Max(room, 0)))
+            {
+                try
+                {
+                    if (file.Size > Images.MaxBytes)
+                    {
+                        rejected++;
+                        continue;
+                    }
+
+                    await using var stream = file.OpenReadStream(Images.MaxBytes);
+                    var stored = await Images.UploadAsync(stream, file.Name, file.ContentType, _uploadScope);
+
+                    _wizard.Answers.PhotoUrls.Add(stored.Url);
+
+                    // Show each photo as it lands rather than after the whole batch.
+                    await InvokeAsync(StateHasChanged);
+                }
+                catch (Exception)
+                {
+                    rejected++;
+                }
+            }
+        }
+        finally
+        {
+            _uploading = false;
+        }
+
+        var megabytes = Images.MaxBytes / (1024 * 1024);
+
+        _photoProblem = rejected switch
+        {
+            0 => null,
+            1 => $"One photo didn't upload. It may be larger than {megabytes} MB.",
+            _ => $"{rejected} photos didn't upload. They may be larger than {megabytes} MB.",
+        };
+    }
+
+    private void RemovePhoto(string url)
+    {
+        _wizard.Answers.PhotoUrls.Remove(url);
+        _photoProblem = null;
     }
 
     private static string StepName(OnboardingStep step) => step switch

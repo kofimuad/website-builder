@@ -4,7 +4,7 @@ namespace WebsiteBuilder.Core.Generation;
 
 /// <summary>
 /// Revises the text of a single section from a plain-language instruction. Only that section is
-/// changed; the returned section keeps the same type and id. Available only when Claude is
+/// changed; the returned section keeps the same type and id. Available only when a model is
 /// configured — the editor hides the assistant otherwise.
 /// </summary>
 public interface ISectionAssistant

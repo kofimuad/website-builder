@@ -5,7 +5,7 @@ using WebsiteBuilder.Core.SiteModel;
 namespace WebsiteBuilder.Core.Generation;
 
 /// <summary>
-/// Tries the primary generator (Claude) and falls back to the secondary (the deterministic
+/// Tries the primary generator (the model) and falls back to the secondary (the deterministic
 /// template) if it fails or is cancelled by nothing but its own error. Onboarding must always end
 /// with a site, even when the model is slow, unavailable, or over budget.
 /// </summary>

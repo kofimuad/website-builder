@@ -31,13 +31,18 @@ Stripe.
 
 | Feature | Why it's inert |
 | --- | --- |
-| Photo uploads (Cloudinary) | No Cloudinary account exists, so `Images:*` is unset and the editor hides the upload button |
-| AI site generation (Claude) | **Anthropic API credit balance is empty.** Sites silently fall back to the deterministic template |
+| Photo uploads (Cloudinary) | No Cloudinary account exists, so `Images:*` is unset. Onboarding and the editor both hide the upload UI |
+| AI site generation (Gemini) | **No `GEMINI_API_KEY` yet.** Sites fall back to the deterministic template. Startup logs which is live |
 | Sign-in email | Resend is DNS-verified, but whether the Railway variables are set is unconfirmed |
 
 **Not built at all:** billing, admin tooling, SEO metadata, custom domains, rollback, analytics.
 
-**Tests:** 355 total, all passing, and the suite no longer calls the Anthropic API — see §11.
+The onboarding **live preview** is the real generator run against the answers so far — the same
+`TemplateSiteGenerator` that builds the site, projected into a small browser mock-up. It was a
+static picture of a plumbing site until 2026-08-08, which meant it showed a mechanic invented
+guarantees and a headline about blocked drains.
+
+**Tests:** 368 total, all passing, and the suite makes no model API calls at all — see §11.
 
 ---
 
@@ -178,17 +183,39 @@ BusinessProfile → ISiteGenerator → SiteDefinition
                        │
        ┌───────────────┴──────────────┐
        ▼                              ▼
-ClaudeSiteGenerator            TemplateSiteGenerator
+ModelSiteGenerator             TemplateSiteGenerator
  (needs API key)                 (always available)
        └──── FallbackSiteGenerator wraps both ────┘
 ```
 
-`FallbackSiteGenerator` tries Claude and falls back to the template on any failure that isn't caller
-cancellation. **Onboarding must always end with a site**, even when the model is slow, unavailable,
-or — as now — out of credit. This is why the empty balance produced no visible outage.
+`FallbackSiteGenerator` tries the model and falls back to the template on any failure that isn't
+caller cancellation. **Onboarding must always end with a site**, even when the model is slow,
+unavailable, or out of credit.
 
-`IClaudeJsonCompletion` is a one-method interface with a single implementation
-(`AnthropicClaudeCompletion`). It is the seam for swapping model providers — see §12.
+### The model provider
+
+**Gemini, via `generateContent`.** `IModelJsonCompletion` is a one-method interface; the single
+implementation is `GeminiJsonCompletion` in the web project, which is the only file that knows
+which provider is in use. Nothing in Core names a vendor.
+
+- **Plain `HttpClient`, no SDK.** One request, one JSON response, a stable documented wire format.
+  A dependency on someone else's release cadence is a poor trade for the lines it would save, and
+  the whole class is testable against a stub handler (`GeminiCompletionTests`).
+- **The model id is configuration** (`Gemini:Model`, default `gemini-3.6-flash`). Google retires
+  ids on a schedule — `gemini-2.0-flash` is already shut down — so moving to the next one is a
+  Railway variable, not a deploy.
+- **The schema crosses unchanged.** Gemini's `responseSchema` accepts the subset of OpenAPI 3.0
+  that covers everything in `SiteGenerationSchema`, including `additionalProperties`. No
+  translation layer, because a translation layer is one more thing that can be silently wrong.
+- **Prices live with the provider.** `ModelCompletionResult` carries the cost the implementation
+  worked out. When the previous provider's per-token prices were constants inside the generator,
+  swapping providers would have kept reporting the old numbers.
+- **Errors are loud.** A non-2xx keeps Google's own message; `MAX_TOKENS` and `SAFETY` throw rather
+  than returning half a site. The fallback still catches all of it, so the visible symptom is
+  generic copy — the log is the only place the reason survives.
+
+Previously Anthropic Claude, removed in favour of Gemini; the implementation is one `git revert`
+away if that decision is reversed.
 
 ### Category templates (WB-45)
 
@@ -221,7 +248,7 @@ whichever one ran. They used to build their lineups separately, and the two drif
 
 Supporting pieces: `SiteGenerationPrompt` (the prompt), `SiteGenerationSchema` (the JSON schema the
 response is constrained to), `GeneratedContentGuard` (validation), `SiteContentAssembler` (turns
-model output into a `SiteDefinition`), `ClaudeSectionAssistant` (the per-section "make this
+model output into a `SiteDefinition`), `ModelSectionAssistant` (the per-section "make this
 friendlier" helper), `InMemoryAssistantRateLimiter` (usage gate).
 
 Themes: `ThemePresetCatalog` holds curated palettes; `Wcag` checks contrast so a generated theme is
@@ -299,6 +326,19 @@ effectively world-writable. `Images:ApiSecret` must never reach the browser.
 Half-configured credentials refuse to start — the only symptom otherwise is an editor that never
 shows the upload button, which is a long way from the cause.
 
+**Photos are asked for during onboarding**, not only in the editor. The Photos step uploads through
+the same `IImageStore` and stores the URLs on `BusinessProfile.PhotoUrls`. Two consequences in
+`SitePlanBuilder`:
+
+- The owner's photos become the gallery and the first becomes the hero. **The category's stock
+  photography is the fallback, not the default** — which is what WB-45 asked for.
+- A category whose lineup has no gallery (consultant) still gets one if photos were uploaded.
+  Asking for photographs and then discarding them is the worse surprise.
+
+Onboarding has no tenant yet — the tenant is created from the finished answers — so uploads land in
+a folder keyed by the interview and stay there. Moving them afterwards would buy tidier folder
+names at the price of rewriting URLs already saved in a site.
+
 ---
 
 ## 10. Email
@@ -313,6 +353,22 @@ Two fail-fast guards, both because the alternative symptom is *silence*:
   locally and catastrophic in production, so **startup now logs which mode is active.**
 
 `System.Net.Mail` can only do STARTTLS. **Port 465 will hang, not fail** — use 587.
+
+### When mail does not arrive
+
+Three failures look identical to the person waiting for the email, and the UI cannot tell them
+apart on purpose. In order of likelihood:
+
+1. **No SMTP host configured.** `LogEmailSender` "sends" successfully to the log, so the UI shows
+   the confirmation screen. Outside Development startup now logs this at **Error**.
+2. **Rate limited.** Five links per address per 15 minutes; the sixth silently shows the same
+   confirmation, because saying "too many attempts" would confirm the address has an account. Easy
+   to hit while testing repeatedly. Logged as a warning.
+3. **The send actually failed.** Then the UI *does* say so ("We could not send the email just
+   now"), and `SmtpEmailSender` logs the host, port, STARTTLS flag, from-address and SMTP status
+   code — because the exception text alone rarely names whichever of those was wrong.
+
+The startup banner reports which mode is live, so it is the first line to read.
 
 ---
 
@@ -341,20 +397,21 @@ domain is *unreachable*, not merely insecure.
 | `Email__FromAddress` | **Required** once `SmtpHost` is set |
 | `Images__CloudName` / `ApiKey` / `ApiSecret` | All three or none |
 | `Auth__GoogleClientId` / `GoogleClientSecret` | Optional pair |
-| `ANTHROPIC_API_KEY` | Optional. Without it, the template generator runs |
+| `Gemini__ApiKey` or `GEMINI_API_KEY` | Optional. Without it, the template generator runs |
+| `Gemini__Model` | Defaults to `gemini-3.6-flash`. Set this when Google retires an id |
 
 ### Testing
 
 xUnit. Integration tests run against **real Postgres** via Testcontainers, so Docker must be running.
 
-**The suite costs nothing to run.** `TenantAppFactory` boots the host with `ANTHROPIC_API_KEY` blanked,
+**The suite costs nothing to run.** `TenantAppFactory` boots the host with the model API key blanked,
 so onboarding tests use `TemplateSiteGenerator`. This is not cosmetic: the factory runs in the
 Development environment, which loads the developer's user secrets, and the key lives there — so every
 onboarding test used to be a live, billed Opus request. `TestHostGenerationTests` pins the guarantee,
 because the failure mode is a bill rather than a red test.
 
-The Claude path itself is covered by `SiteGenerationTests` and `SectionAssistantTests` using scripted
-`IClaudeJsonCompletion` fakes, which pin its behaviour — including malformed and throwing responses —
+The model path itself is covered by `SiteGenerationTests` and `SectionAssistantTests` using scripted
+`IModelJsonCompletion` fakes, which pin its behaviour — including malformed and throwing responses —
 more precisely than a live call could.
 
 ---

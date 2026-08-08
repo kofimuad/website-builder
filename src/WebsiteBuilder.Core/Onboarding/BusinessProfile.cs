@@ -53,5 +53,13 @@ public class BusinessProfile : ITenantOwned
     /// <summary>Where they work, in their words: "Osu and East Legon", "all of Accra".</summary>
     public string? ServiceArea { get; set; }
 
+    /// <summary>
+    /// Photos of their own work, uploaded during onboarding. Stored as delivery URLs rather than
+    /// provider ids so that an image from anywhere keeps rendering — the same reason the site
+    /// schema stores URLs. When this is non-empty the generated gallery uses these instead of the
+    /// category's stock photography, which is what makes stock a fallback rather than a decoration.
+    /// </summary>
+    public List<string> PhotoUrls { get; set; } = [];
+
     public DateTimeOffset UpdatedUtc { get; set; } = DateTimeOffset.UtcNow;
 }
