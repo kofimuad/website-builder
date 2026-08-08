@@ -9,8 +9,9 @@ public sealed class TenantResolutionOptions
 
     /// <summary>
     /// Subdomains the platform keeps for itself; these never resolve to a tenant.
-    /// An array rather than a set because the configuration binder merges into an existing
-    /// collection, which would make configured values additive to the defaults.
+    /// Configuration <em>adds</em> to this list rather than replacing it — the binder appends to
+    /// the existing array — so these defaults cannot be switched off from appsettings, which is
+    /// what we want given what they protect. See TenantResolutionOptionsBindingTests.
     /// </summary>
     /// <remarks>
     /// Three reasons a label belongs here, and all three are load-bearing:

@@ -54,7 +54,7 @@ public class SignInTests(PostgresFixture fixture)
 
         var urls = new PlatformUrls(
             new HttpContextAccessor(),
-            Options.Create(new PlatformOptions { PublicBaseUrl = "https://sitely.test" }),
+            Options.Create(new PlatformOptions { PublicBaseUrl = "https://csbuild.test" }),
             Options.Create(new TenantResolutionOptions()));
 
         var service = new OwnerSignInService(

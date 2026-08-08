@@ -50,6 +50,34 @@ public sealed class PlatformUrls(
 
     public string Absolute(string relativePath) => $"{BaseUrl}/{relativePath.TrimStart('/')}";
 
+    /// <summary>
+    /// The public address of a tenant's own site, e.g. "https://joesplumbing.csbuild.app".
+    ///
+    /// Scheme and port come from <see cref="PlatformOptions.PublicBaseUrl"/> when it is set,
+    /// deliberately and not from the current request: this is called from inside a Blazor circuit
+    /// where there is no <c>HttpContext</c> at all, so a request-derived scheme would silently
+    /// become "https" with no port and produce a link that does not work locally.
+    /// </summary>
+    public string TenantSite(string subdomain)
+    {
+        var host = $"{subdomain}.{tenantOptions.Value.PlatformDomain}";
+        var configured = platformOptions.Value.PublicBaseUrl;
+
+        if (!string.IsNullOrWhiteSpace(configured)
+            && Uri.TryCreate(configured, UriKind.Absolute, out var baseUri))
+        {
+            return baseUri.IsDefaultPort
+                ? $"{baseUri.Scheme}://{host}"
+                : $"{baseUri.Scheme}://{host}:{baseUri.Port}";
+        }
+
+        var request = httpContextAccessor.HttpContext?.Request;
+        var scheme = request?.Scheme ?? "https";
+        var port = request?.Host.Port;
+
+        return port is null or 80 or 443 ? $"{scheme}://{host}" : $"{scheme}://{host}:{port}";
+    }
+
     public string LeadsInbox(Guid siteId) => Absolute($"manage/{siteId}/leads");
 
     public string MagicLink(string token) => Absolute($"auth/verify?token={Uri.EscapeDataString(token)}");

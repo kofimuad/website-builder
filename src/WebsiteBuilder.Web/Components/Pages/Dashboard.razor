@@ -11,7 +11,7 @@
 @inject LeadsService LeadsService
 @inject IOptions<TenantResolutionOptions> TenantOptions
 
-<PageTitle>Your dashboard — Sitely</PageTitle>
+<PageTitle>Your dashboard — @Branding.Name</PageTitle>
 
 @* Visitor statistics are deliberately absent: nothing counts them yet (WB-37), and a dashboard
    that invents numbers is worse than one that shows fewer. *@
@@ -20,7 +20,7 @@
     <aside class="sidebar">
         <a class="side-brand" href="/">
             <span class="side-mark">@Icon("layout-template")</span>
-            <span class="side-word">Sitely</span>
+            <span class="side-word">@Branding.Name</span>
         </a>
 
         <nav class="side-nav">
@@ -41,7 +41,7 @@
 
         <div class="upgrade">
             <div class="upgrade-t">You're on the free plan</div>
-            <div class="upgrade-s">Connect your own domain and remove the Sitely badge.</div>
+            <div class="upgrade-s">Connect your own domain and remove the @Branding.Name badge.</div>
             <a class="upgrade-btn" href="#">Upgrade</a>
         </div>
 

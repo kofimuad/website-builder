@@ -269,3 +269,67 @@ svg { width: 1em; height: 1em; flex-shrink: 0; }
 }
 
 .gal-error { margin: 0; font-size: 13px; color: #FFB4AB; }
+
+/* ---------- publish sheets: choose an address, then go live ---------- */
+.sheet-backdrop {
+    position: fixed; inset: 0; z-index: 40;
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+    background: rgba(10, 10, 13, .68);
+}
+.sheet {
+    width: 100%; max-width: 460px;
+    display: flex; flex-direction: column; gap: 14px;
+    padding: 26px;
+    border: 1px solid #33333C; border-radius: 14px;
+    background: #1F1F25;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, .45);
+}
+.sheet h2 { margin: 0; font-family: var(--font-head); font-size: 21px; color: #F2F2F5; }
+.sheet-lead { margin: 0; font-size: 14px; line-height: 1.5; color: #A5A5B0; }
+.sheet-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* address picker */
+.addr-row {
+    display: flex; align-items: stretch;
+    border: 1px solid #3A3A42; border-radius: 9px;
+    background: #17171C;
+    overflow: hidden;
+}
+.addr-input {
+    flex: 1 1 auto; min-width: 0;
+    padding: 11px 12px;
+    background: none; border: none; outline: none;
+    color: #F2F2F5; font-family: var(--font-body); font-size: 15px;
+}
+.addr-input.bad { color: #E79A9A; }
+.addr-suffix {
+    display: flex; align-items: center;
+    padding: 0 12px;
+    border-left: 1px solid #2C2C34;
+    background: #202027;
+    color: #8A8A94; font-size: 14px; white-space: nowrap;
+}
+.addr-note { margin: 0; font-size: 13px; min-height: 18px; }
+.addr-note.ok { color: #7FD6AD; }
+.addr-note.bad { color: #E79A9A; }
+
+/* live confirmation */
+.sheet.live { align-items: center; text-align: center; }
+.live-mark {
+    display: grid; place-items: center;
+    width: 46px; height: 46px; border-radius: 50%;
+    background: #24312A; color: #7FD6AD;
+}
+.live-mark svg { width: 24px; height: 24px; }
+.live-url {
+    display: flex; gap: 8px; width: 100%;
+}
+.live-url input {
+    flex: 1 1 auto; min-width: 0;
+    padding: 10px 12px;
+    border: 1px solid #3A3A42; border-radius: 8px;
+    background: #17171C;
+    color: #F2F2F5; font-family: var(--font-body); font-size: 14px;
+}
+.live-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }

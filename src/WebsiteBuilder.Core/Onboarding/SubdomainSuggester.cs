@@ -57,7 +57,11 @@ public static class SubdomainSuggester
             slug = slug[..MaxLength].TrimEnd('-');
         }
 
-        return slug.Length == 0 ? Fallback : slug;
+        // Anything this produces must survive SubdomainPolicy, or a name auto-assigned at
+        // onboarding would be rejected at that same owner's first publish. One- and two-letter
+        // addresses are held back deliberately, so a name that short falls back instead — and the
+        // owner picks a real address before going live anyway.
+        return slug.Length < SubdomainPolicy.MinLength ? Fallback : slug;
     }
 
     /// <summary>

@@ -7,14 +7,14 @@
 @* Static server rendering on purpose. The form posts a real request, so Blazor handles the
    antiforgery token for us, and there is no circuit to lose the submitted address to. *@
 
-<PageTitle>Sign in — Sitely</PageTitle>
+<PageTitle>Sign in — @Branding.Name</PageTitle>
 
 <div class="signin">
     <a class="brand" href="/">
         <span class="brand-mark">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="7" x="3" y="3" rx="1"/><rect width="9" height="7" x="3" y="14" rx="1"/><rect width="5" height="7" x="16" y="14" rx="1"/></svg>
         </span>
-        Sitely
+        @Branding.Name
     </a>
 
     <div class="card">
@@ -32,7 +32,7 @@
         }
         else
         {
-            <h1>Sign in to Sitely</h1>
+            <h1>Sign in to @Branding.Name</h1>
             <p class="lead">We'll email you a link. No password to remember.</p>
 
             @if (_error is not null)

@@ -164,14 +164,14 @@ public sealed class OwnerSignInService(
 
     private EmailMessage Compose(string to, string link) => new(
         to,
-        "Your Sitely sign-in link",
+        $"Your {Branding.Name} sign-in link",
         $"""
-         <p>Click the button below to sign in to Sitely. The link works once and expires in {SignInToken.Lifetime.TotalMinutes:0} minutes.</p>
-         <p><a href="{link}" style="display:inline-block;padding:12px 20px;background:#1f5eff;color:#fff;border-radius:8px;text-decoration:none">Sign in to Sitely</a></p>
+         <p>Click the button below to sign in to {Branding.Name}. The link works once and expires in {SignInToken.Lifetime.TotalMinutes:0} minutes.</p>
+         <p><a href="{link}" style="display:inline-block;padding:12px 20px;background:#1f5eff;color:#fff;border-radius:8px;text-decoration:none">Sign in to {Branding.Name}</a></p>
          <p style="color:#666;font-size:13px">If you did not ask for this, you can ignore this email — nobody can sign in without the link.</p>
          """,
         $"""
-         Click the link below to sign in to Sitely. It works once and expires in {SignInToken.Lifetime.TotalMinutes:0} minutes.
+         Click the link below to sign in to {Branding.Name}. It works once and expires in {SignInToken.Lifetime.TotalMinutes:0} minutes.
 
          {link}
 

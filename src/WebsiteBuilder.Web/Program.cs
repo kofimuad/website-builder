@@ -119,7 +119,7 @@ var authentication = builder.Services
         options.AccessDeniedPath = AuthEndpoints.SignInPath;
         options.ExpireTimeSpan = TimeSpan.FromDays(30);
         options.SlidingExpiration = true;
-        options.Cookie.Name = "sitely_auth";
+        options.Cookie.Name = $"{Branding.CookiePrefix}_auth";
         options.Cookie.HttpOnly = true;
         options.Cookie.SameSite = SameSiteMode.Lax;
         options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
@@ -132,7 +132,7 @@ if (authOptions.IsGoogleConfigured)
     authentication
         .AddCookie(AuthSchemes.External, options =>
         {
-            options.Cookie.Name = "sitely_external";
+            options.Cookie.Name = $"{Branding.CookiePrefix}_external";
             options.ExpireTimeSpan = TimeSpan.FromMinutes(10);
             options.Cookie.SameSite = SameSiteMode.Lax;
         })
@@ -204,9 +204,12 @@ var tenantOptions = builder.Configuration.GetSection(TenantResolutionOptions.Sec
     ?? new TenantResolutionOptions();
 
 app.Logger.LogInformation(
-    "Tenant subdomains hang off {PlatformDomain}. Site generation: {Generator}. " +
+    "Tenant subdomains hang off {PlatformDomain}. Sign-in email: {Mail}. Site generation: {Generator}. " +
     "Per-section assistant: {Assistant}. Photo uploads: {Images}.",
     tenantOptions.PlatformDomain,
+    emailOptions.IsConfigured
+        ? $"sending via {emailOptions.SmtpHost} as {emailOptions.FromAddress}"
+        : "WRITTEN TO THIS LOG, NOT SENT — no Email:SmtpHost configured",
     string.IsNullOrWhiteSpace(anthropicKey) ? "template only" : "Claude, template fallback",
     string.IsNullOrWhiteSpace(anthropicKey) ? "unavailable" : "available",
     imageOptions.IsConfigured ? $"Cloudinary ({imageOptions.CloudName})" : "unavailable");

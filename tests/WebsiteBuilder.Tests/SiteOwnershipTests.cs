@@ -6,6 +6,7 @@ using WebsiteBuilder.Core.Onboarding;
 using WebsiteBuilder.Core.SiteModel;
 using WebsiteBuilder.Core.Tenancy;
 using WebsiteBuilder.Data;
+using WebsiteBuilder.Web.Platform;
 using WebsiteBuilder.Web.Management;
 using WebsiteBuilder.Web.Onboarding;
 
@@ -228,7 +229,7 @@ public class SiteOwnershipTests(PostgresFixture fixture) : IDisposable
             .GetAsync("http://platform.com/signin");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("Sign in to Sitely", await response.Content.ReadAsStringAsync());
+        Assert.Contains($"Sign in to {Branding.Name}", await response.Content.ReadAsStringAsync());
     }
 
     [Fact]

@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using Npgsql;
 using WebsiteBuilder.Core.Entities;
 using WebsiteBuilder.Core.Onboarding;
 using WebsiteBuilder.Data;
@@ -7,7 +9,7 @@ using WebsiteBuilder.Web.Publishing;
 
 namespace WebsiteBuilder.Web.Management;
 
-public sealed record ManagedSite(Site Site, BusinessProfile Profile);
+public sealed record ManagedSite(Site Site, BusinessProfile Profile, string Subdomain);
 
 /// <summary>One row of the owner's dashboard: a site plus the few facts the list needs.</summary>
 public sealed record OwnedSite(
@@ -33,7 +35,8 @@ public sealed record OwnedSite(
 public sealed class SiteManagementService(
     WebsiteBuilderDbContext db,
     TenantContext tenantContext,
-    SitePublisher publisher)
+    SitePublisher publisher,
+    IOptions<TenantResolutionOptions> tenantOptions)
 {
     /// <summary>
     /// Loads a site and its profile for the given owner and scopes the context to that tenant.
@@ -53,23 +56,26 @@ public sealed class SiteManagementService(
         // IgnoreQueryFilters because no tenant is in scope yet — that is what this call establishes.
         // The join to Tenants is the authorisation: a site whose tenant has a different owner, or
         // no owner at all, never gets past here.
-        var site = await db.Sites
+        // The site is projected inside an anonymous type rather than selected alone so the tenant's
+        // address comes back in the same round trip. It stays tracked either way, which the editor
+        // relies on when it mutates the draft in place.
+        var found = await db.Sites
             .IgnoreQueryFilters()
             .Where(s => s.Id == siteId)
             .Join(
                 db.Tenants.Where(t => t.OwnerId == ownerId),
                 s => s.TenantId,
                 t => t.Id,
-                (s, _) => s)
+                (s, t) => new { Site = s, t.Subdomain })
             .FirstOrDefaultAsync(cancellationToken);
 
-        if (site is null)
+        if (found is null)
         {
             return null;
         }
 
         // Only now: act as this tenant for the rest of the unit of work.
-        tenantContext.TenantId = site.TenantId;
+        tenantContext.TenantId = found.Site.TenantId;
 
         var profile = await db.BusinessProfiles.FirstOrDefaultAsync(cancellationToken);
         if (profile is null)
@@ -77,7 +83,7 @@ public sealed class SiteManagementService(
             return null;
         }
 
-        return new ManagedSite(site, profile);
+        return new ManagedSite(found.Site, profile, found.Subdomain);
     }
 
     /// <summary>
@@ -166,4 +172,75 @@ public sealed class SiteManagementService(
 
     public Task PublishAsync(Guid siteId, CancellationToken cancellationToken = default) =>
         publisher.PublishAsync(siteId, cancellationToken);
+
+    /// <summary>
+    /// Checks an address the owner typed: shape first, then whether anyone holds it.
+    /// <see cref="SubdomainProblem.None"/> means it looked free a moment ago — it is not a
+    /// reservation, so <see cref="ChangeSubdomainAsync"/> checks again and can still refuse.
+    /// </summary>
+    public async Task<SubdomainProblem> CheckSubdomainAsync(
+        string? candidate,
+        CancellationToken cancellationToken = default)
+    {
+        var problem = SubdomainPolicy.Validate(candidate, tenantOptions.Value);
+        if (problem != SubdomainProblem.None)
+        {
+            return problem;
+        }
+
+        var value = SubdomainPolicy.Normalize(candidate);
+
+        // Across all tenants, not just the one in scope: the address has to be unique platform-wide.
+        var taken = await db.Tenants.AsNoTracking()
+            .AnyAsync(t => t.Subdomain == value, cancellationToken);
+
+        return taken ? SubdomainProblem.Taken : SubdomainProblem.None;
+    }
+
+    /// <summary>
+    /// Moves the loaded site's tenant to a new address. Only allowed while the site has never been
+    /// published: once a link is out in the world — printed on a card, sent on WhatsApp — changing
+    /// where it points breaks it silently, and nothing redirects the old one. Renaming a live site
+    /// is its own story with its own answer for the old address.
+    /// </summary>
+    public async Task<SubdomainProblem> ChangeSubdomainAsync(
+        Guid siteId,
+        string? candidate,
+        CancellationToken cancellationToken = default)
+    {
+        var site = await db.Sites.FirstOrDefaultAsync(s => s.Id == siteId, cancellationToken)
+            ?? throw new InvalidOperationException($"Site {siteId} is not in scope for the current tenant.");
+
+        if (site.IsPublished)
+        {
+            throw new InvalidOperationException(
+                "The address of a published site cannot be changed — existing links would break.");
+        }
+
+        var problem = await CheckSubdomainAsync(candidate, cancellationToken);
+        if (problem != SubdomainProblem.None)
+        {
+            return problem;
+        }
+
+        var tenant = await db.Tenants.FirstOrDefaultAsync(t => t.Id == site.TenantId, cancellationToken)
+            ?? throw new InvalidOperationException($"Tenant {site.TenantId} is missing.");
+
+        var previous = tenant.Subdomain;
+        tenant.Subdomain = SubdomainPolicy.Normalize(candidate);
+
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" })
+        {
+            // Two owners can pass the availability check in the same instant. The unique index is
+            // what actually decides, so report the loser the same "taken" the check would have.
+            tenant.Subdomain = previous;
+            return SubdomainProblem.Taken;
+        }
+
+        return SubdomainProblem.None;
+    }
 }

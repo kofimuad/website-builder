@@ -22,7 +22,7 @@ public class LeadNotificationTests(PostgresFixture fixture)
 
         var urls = new PlatformUrls(
             new HttpContextAccessor(),
-            Options.Create(new PlatformOptions { PublicBaseUrl = "https://sitely.test" }),
+            Options.Create(new PlatformOptions { PublicBaseUrl = "https://csbuild.test" }),
             Options.Create(new TenantResolutionOptions()));
 
         return (new EmailLeadNotifier(db, email, urls, NullLogger<EmailLeadNotifier>.Instance), email);
@@ -75,7 +75,7 @@ public class LeadNotificationTests(PostgresFixture fixture)
         Assert.Contains("Ama Boateng", sent.Subject);
         Assert.Contains("Blocked kitchen drain", sent.TextBody);
         Assert.Contains("+233209999999", sent.TextBody);
-        Assert.Contains($"https://sitely.test/manage/{siteId}/leads", sent.TextBody);
+        Assert.Contains($"https://csbuild.test/manage/{siteId}/leads", sent.TextBody);
     }
 
     [Fact]

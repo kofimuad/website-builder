@@ -1,15 +1,21 @@
 @page "/manage/{SiteId:guid}/edit"
+@using Microsoft.JSInterop
 @using WebsiteBuilder.Core.Generation
 @using WebsiteBuilder.Core.SiteModel
+@using WebsiteBuilder.Core.Tenancy
 @using WebsiteBuilder.Web.Auth
 @using WebsiteBuilder.Web.Images
 @using WebsiteBuilder.Web.Management
+@using WebsiteBuilder.Web.Platform
 @attribute [Authorize]
 @rendermode InteractiveServer
 @implements IDisposable
 @inject SiteManagementService Management
 @inject IServiceProvider Services
 @inject IAssistantRateLimiter RateLimiter
+@inject PlatformUrls Urls
+@inject IJSRuntime JS
+@inject Microsoft.Extensions.Options.IOptions<TenantResolutionOptions> TenantOptions
 
 <PageTitle>Edit your website</PageTitle>
 
@@ -37,6 +43,79 @@ else
             <button type="button" class="btn primary" @onclick="Publish" disabled="@_publishing">Publish</button>
         </div>
     </div>
+
+    @if (_showAddress)
+    {
+        <div class="sheet-backdrop" @onclick="CloseAddress">
+            <div class="sheet" @onclick:stopPropagation="true">
+                <h2>Choose your web address</h2>
+                <p class="sheet-lead">
+                    This is the link you'll give customers. Pick it now — once your site is live
+                    the address stays put, so links you've shared keep working.
+                </p>
+
+                <div class="addr-row">
+                    <input class="addr-input @(_addressProblem == SubdomainProblem.None ? "" : "bad")"
+                           value="@_addressInput"
+                           @oninput="OnAddressInput"
+                           placeholder="your-business"
+                           aria-label="Your web address"
+                           autocomplete="off" />
+                    <span class="addr-suffix">.@PlatformDomain</span>
+                </div>
+
+                <p class="addr-note @(_addressProblem == SubdomainProblem.None ? "ok" : "bad")">
+                    @if (_addressChecking)
+                    {
+                        <span>Checking…</span>
+                    }
+                    else if (_addressProblem == SubdomainProblem.None)
+                    {
+                        <span>@PreviewAddress is free.</span>
+                    }
+                    else
+                    {
+                        <span>@SubdomainPolicy.Describe(_addressProblem)</span>
+                    }
+                </p>
+
+                <div class="sheet-actions">
+                    <button type="button" class="btn" @onclick="CloseAddress">Not yet</button>
+                    <button type="button" class="btn primary"
+                            disabled="@(_publishing || _addressChecking || _addressProblem != SubdomainProblem.None)"
+                            @onclick="ConfirmAddressAndPublish">
+                        @(_publishing ? "Publishing…" : "Publish my website")
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (_showLive)
+    {
+        <div class="sheet-backdrop" @onclick="() => _showLive = false">
+            <div class="sheet live" @onclick:stopPropagation="true">
+                <div class="live-mark">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                </div>
+                <h2>Your website is live</h2>
+                <p class="sheet-lead">Anyone with this link can see it now.</p>
+
+                <div class="live-url">
+                    <input readonly value="@_liveUrl" aria-label="Your website address" />
+                    <button type="button" class="btn" @onclick="CopyLink">@(_copied ? "Copied" : "Copy")</button>
+                </div>
+
+                <div class="live-actions">
+                    <a class="btn primary" href="@WhatsAppShareUrl" target="_blank" rel="noopener">
+                        Share on WhatsApp
+                    </a>
+                    <a class="btn" href="@_liveUrl" target="_blank" rel="noopener">Open my site</a>
+                    <button type="button" class="btn" @onclick="() => _showLive = false">Done</button>
+                </div>
+            </div>
+        </div>
+    }
 
     @if (_showThemes)
     {
@@ -262,6 +341,17 @@ else
     private int _previewNonce;
     private bool _showPicker;
     private bool _showThemes = true;
+
+    private string _subdomain = "";
+    private bool _showAddress;
+    private string _addressInput = "";
+    private SubdomainProblem _addressProblem = SubdomainProblem.None;
+    private bool _addressChecking;
+    private CancellationTokenSource? _addressDebounce;
+
+    private bool _showLive;
+    private string _liveUrl = "";
+    private bool _copied;
     private string? _undoLabel;
     private Action? _undoAction;
     private CancellationTokenSource? _debounce;
@@ -297,6 +387,8 @@ else
         }
 
         _site = managed.Site;
+        _subdomain = managed.Subdomain;
+        _addressInput = managed.Subdomain;
     }
 
     private void OpenAi(int index)
@@ -557,14 +649,133 @@ else
         _previewNonce++;
     }
 
+    private string PlatformDomain => TenantOptions.Value.PlatformDomain;
+
+    private string PreviewAddress => $"{_addressInput}.{PlatformDomain}";
+
+    /// <summary>
+    /// wa.me with no number opens WhatsApp and lets the owner pick who to send to, which is what
+    /// sharing means here — they are telling their own customers, not us messaging anyone.
+    /// </summary>
+    private string WhatsAppShareUrl =>
+        $"https://wa.me/?text={Uri.EscapeDataString($"Take a look at my new website: {_liveUrl}")}";
+
+    /// <summary>
+    /// The first publish is the one that fixes the address, so it asks. Afterwards Publish means
+    /// "push my changes" and should not interrupt.
+    /// </summary>
     private async Task Publish()
+    {
+        if (_site is not null && !_site.IsPublished)
+        {
+            _addressInput = _subdomain;
+            _addressProblem = SubdomainProblem.None;
+            _showAddress = true;
+            return;
+        }
+
+        await PublishNow(celebrate: false);
+    }
+
+    private void CloseAddress()
+    {
+        _showAddress = false;
+        _addressDebounce?.Cancel();
+        _addressChecking = false;
+    }
+
+    private async Task OnAddressInput(ChangeEventArgs args)
+    {
+        _addressInput = SubdomainPolicy.Normalize(args.Value?.ToString());
+
+        // Their own address is not "free", but it is theirs. Without this, opening the dialog and
+        // typing nothing would accuse the owner of clashing with themselves.
+        if (string.Equals(_addressInput, _subdomain, StringComparison.Ordinal))
+        {
+            _addressDebounce?.Cancel();
+            _addressChecking = false;
+            _addressProblem = SubdomainProblem.None;
+            return;
+        }
+
+        // Shape and reserved names are decided locally and instantly; only a name that could
+        // actually be free is worth a round trip.
+        var shape = SubdomainPolicy.Validate(_addressInput, TenantOptions.Value);
+        if (shape != SubdomainProblem.None)
+        {
+            _addressDebounce?.Cancel();
+            _addressChecking = false;
+            _addressProblem = shape;
+            return;
+        }
+
+        _addressDebounce?.Cancel();
+        _addressDebounce?.Dispose();
+        _addressDebounce = new CancellationTokenSource();
+        var token = _addressDebounce.Token;
+
+        _addressChecking = true;
+
+        try
+        {
+            await Task.Delay(400, token);
+            var problem = await Management.CheckSubdomainAsync(_addressInput, token);
+            if (token.IsCancellationRequested)
+            {
+                return;
+            }
+
+            _addressProblem = problem;
+            _addressChecking = false;
+            StateHasChanged();
+        }
+        catch (OperationCanceledException)
+        {
+            // Superseded by a later keystroke; that call owns the state now.
+        }
+    }
+
+    private async Task ConfirmAddressAndPublish()
+    {
+        if (!string.Equals(_addressInput, _subdomain, StringComparison.Ordinal))
+        {
+            _publishing = true;
+            try
+            {
+                var problem = await Management.ChangeSubdomainAsync(SiteId, _addressInput);
+                if (problem != SubdomainProblem.None)
+                {
+                    // Someone took it between the check and here. Stay on the dialog and say so.
+                    _addressProblem = problem;
+                    return;
+                }
+
+                _subdomain = _addressInput;
+            }
+            finally
+            {
+                _publishing = false;
+            }
+        }
+
+        _showAddress = false;
+        await PublishNow(celebrate: true);
+    }
+
+    private async Task PublishNow(bool celebrate)
     {
         _publishing = true;
         try
         {
             await SaveAsync();
             await Management.PublishAsync(SiteId);
+
+            _liveUrl = Urls.TenantSite(_subdomain);
+            _copied = false;
             _status = "Published — your changes are live";
+
+            // Going live is worth a moment. Every republish after that is not.
+            _showLive = celebrate;
         }
         catch (Exception)
         {
@@ -576,9 +787,27 @@ else
         }
     }
 
+    private async Task CopyLink()
+    {
+        try
+        {
+            // The only JavaScript this app calls. navigator.clipboard is invoked by path, so it
+            // needs no script file of our own.
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", _liveUrl);
+            _copied = true;
+        }
+        catch (Exception)
+        {
+            // Blocked, or an insecure context. The link is in a focusable input either way.
+            _copied = false;
+        }
+    }
+
     public void Dispose()
     {
         _debounce?.Cancel();
         _debounce?.Dispose();
+        _addressDebounce?.Cancel();
+        _addressDebounce?.Dispose();
     }
 }
