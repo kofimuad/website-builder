@@ -52,4 +52,56 @@ public class StartupConfigurationTests
             exception is null || !exception.Message.Contains("No database connection string"),
             $"Startup rejected a valid DATABASE_URL: {exception?.Message}");
     }
+
+    [Fact]
+    public void A_mail_provider_without_a_from_address_stops_the_app()
+    {
+        // Otherwise the symptom is silence: links reported as sent that never arrive anywhere.
+        using var factory = new ConfiguredAppFactory(new Dictionary<string, string?>
+        {
+            ["DATABASE_URL"] = "postgresql://u:p@127.0.0.1:1/db",
+            ["RunMigrationsOnStartup"] = "false",
+            ["Email:SmtpHost"] = "smtp.resend.com",
+        });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("Email:FromAddress", exception.Message);
+    }
+
+    [Theory]
+    [InlineData("Images:CloudName")]
+    [InlineData("Images:ApiKey")]
+    [InlineData("Images:ApiSecret")]
+    public void Half_configured_image_credentials_stop_the_app_rather_than_silently_disabling_uploads(string key)
+    {
+        // The symptom of a silently-disabled image store is an editor that never shows the upload
+        // button, which is a long way from the cause.
+        using var factory = new ConfiguredAppFactory(new Dictionary<string, string?>
+        {
+            ["DATABASE_URL"] = "postgresql://u:p@127.0.0.1:1/db",
+            ["RunMigrationsOnStartup"] = "false",
+            [key] = "set-but-alone",
+        });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("CloudName, ApiKey and ApiSecret", exception.Message);
+    }
+
+    [Fact]
+    public void No_image_credentials_at_all_is_a_supported_configuration()
+    {
+        using var factory = new ConfiguredAppFactory(new Dictionary<string, string?>
+        {
+            ["DATABASE_URL"] = "postgresql://u:p@127.0.0.1:1/db",
+            ["RunMigrationsOnStartup"] = "false",
+        });
+
+        var exception = Record.Exception(() => factory.CreateClient());
+
+        Assert.True(
+            exception is null || !exception.Message.Contains("CloudName"),
+            $"Startup objected to having no image provider: {exception?.Message}");
+    }
 }

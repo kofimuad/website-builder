@@ -2,6 +2,7 @@
 @using WebsiteBuilder.Core.Generation
 @using WebsiteBuilder.Core.SiteModel
 @using WebsiteBuilder.Web.Auth
+@using WebsiteBuilder.Web.Images
 @using WebsiteBuilder.Web.Management
 @attribute [Authorize]
 @rendermode InteractiveServer
@@ -112,11 +113,23 @@ else
                         <input class="edit h1" @bind="hero.Headline" @bind:event="oninput" @bind:after="MarkDirty" placeholder="Your headline" />
                         <textarea class="edit lead" rows="2" @bind="hero.Subheadline" @bind:event="oninput" @bind:after="MarkDirty" placeholder="A supporting line"></textarea>
                         <input class="edit button" @bind="hero.CallToActionLabel" @bind:event="oninput" @bind:after="MarkDirty" placeholder="Button text" />
+                        @if (_images is not null)
+                        {
+                            <ImageField Store="_images" TenantId="_site.TenantId" AddLabel="Add a main photo"
+                                        Url="hero.ImageUrl"
+                                        UrlChanged="url => { hero.ImageUrl = url; MarkDirty(); }" />
+                        }
                         break;
 
                     case AboutSection about:
                         <input class="edit h2" @bind="about.Heading" @bind:event="oninput" @bind:after="MarkDirty" placeholder="About heading" />
                         <textarea class="edit body" rows="4" @bind="about.Body" @bind:event="oninput" @bind:after="MarkDirty" placeholder="Tell customers about your business"></textarea>
+                        @if (_images is not null)
+                        {
+                            <ImageField Store="_images" TenantId="_site.TenantId" AddLabel="Add a photo"
+                                        Url="about.ImageUrl"
+                                        UrlChanged="url => { about.ImageUrl = url; MarkDirty(); }" />
+                        }
                         break;
 
                     case ServicesSection services:
@@ -144,7 +157,33 @@ else
 
                     case GallerySection gallery:
                         <input class="edit h2" @bind="gallery.Heading" @bind:event="oninput" @bind:after="MarkDirty" placeholder="Gallery heading" />
-                        <p class="muted">Photos can be added from the Business details page (uploads are coming soon).</p>
+                        @if (_images is null)
+                        {
+                            <p class="muted">Photos can be added once picture uploads are switched on.</p>
+                        }
+                        else
+                        {
+                            @foreach (var image in gallery.Images.ToList())
+                            {
+                                var photo = image;
+                                <div class="item gal">
+                                    <img class="gal-thumb" src="@ImageDelivery.Cropped(photo.Url, 360, 240)" alt="" />
+                                    <input class="edit small" @bind="photo.AltText" @bind:event="oninput" @bind:after="MarkDirty"
+                                           placeholder="Describe this photo — helps Google and screen readers" />
+                                    <button type="button" class="gal-drop" @onclick="() => RemoveGalleryImage(gallery, photo)">Remove</button>
+                                </div>
+                            }
+
+                            <label class="gal-add @(_galleryBusy ? "busy" : "")">
+                                <InputFile OnChange="e => AddGalleryImagesAsync(gallery, e)" multiple accept="image/*" disabled="@_galleryBusy" />
+                                <span>@(_galleryBusy ? "Uploading…" : "Add photos")</span>
+                            </label>
+
+                            @if (_galleryError is not null)
+                            {
+                                <p class="gal-error" role="alert">@_galleryError</p>
+                            }
+                        }
                         break;
 
                     case ContactSection contact:
@@ -233,11 +272,21 @@ else
     private string? _aiError;
     private bool _aiBusy;
 
+    /// <summary>Null when no image provider is configured; the editor then offers no uploads.</summary>
+    private IImageStore? _images;
+
+    private bool _galleryBusy;
+    private string? _galleryError;
+
+    /// <summary>Ceiling on one gallery selection, so a full camera roll can't be picked by accident.</summary>
+    private const int MaxPhotosPerSelection = 12;
+
     [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
         _assistant = Services.GetService<ISectionAssistant>();
+        _images = Services.GetService<IImageStore>();
 
         // Someone else's site id resolves to null here, exactly like one that does not exist.
         var managed = await Management.LoadAsync(SiteId, await AuthState.OwnerIdAsync());
@@ -298,6 +347,78 @@ else
         {
             _aiBusy = false;
         }
+    }
+
+    private void RemoveGalleryImage(GallerySection gallery, GalleryImage photo)
+    {
+        var index = gallery.Images.IndexOf(photo);
+        if (index < 0)
+        {
+            return;
+        }
+
+        gallery.Images.RemoveAt(index);
+        _galleryError = null;
+
+        _undoLabel = "Photo removed.";
+        _undoAction = () => gallery.Images.Insert(Math.Min(index, gallery.Images.Count), photo);
+        MarkDirty();
+    }
+
+    /// <summary>
+    /// Uploads a whole selection. Each photo is independent: one that is too large or that the
+    /// provider rejects is counted and skipped, because discarding four good photos over a fifth
+    /// bad one is the wrong trade for someone adding pictures of their work.
+    /// </summary>
+    private async Task AddGalleryImagesAsync(GallerySection gallery, InputFileChangeEventArgs e)
+    {
+        if (_images is null)
+        {
+            return;
+        }
+
+        _galleryBusy = true;
+        _galleryError = null;
+
+        var rejected = 0;
+        try
+        {
+            foreach (var file in e.GetMultipleFiles(MaxPhotosPerSelection))
+            {
+                try
+                {
+                    if (file.Size > _images.MaxBytes)
+                    {
+                        rejected++;
+                        continue;
+                    }
+
+                    await using var stream = file.OpenReadStream(_images.MaxBytes);
+                    var stored = await _images.UploadAsync(stream, file.Name, file.ContentType, _site!.TenantId);
+
+                    gallery.Images.Add(new GalleryImage { Url = stored.Url, AltText = "" });
+                    MarkDirty();
+
+                    // Show each photo as it lands rather than after the whole batch.
+                    await InvokeAsync(StateHasChanged);
+                }
+                catch (Exception)
+                {
+                    rejected++;
+                }
+            }
+        }
+        finally
+        {
+            _galleryBusy = false;
+        }
+
+        _galleryError = rejected switch
+        {
+            0 => null,
+            1 => $"One photo didn't upload. It may be larger than {_images.MaxBytes / (1024 * 1024)} MB.",
+            _ => $"{rejected} photos didn't upload. They may be larger than {_images.MaxBytes / (1024 * 1024)} MB.",
+        };
     }
 
     private void Move(int index, int delta)

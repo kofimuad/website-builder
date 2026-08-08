@@ -23,10 +23,15 @@ public sealed class EmailOptions
     public string? SmtpPassword { get; set; }
     public bool UseStartTls { get; set; } = true;
 
-    /// <summary>The From address. Must be one the SMTP provider has authorised, or mail will bounce.</summary>
-    public string FromAddress { get; set; } = "no-reply@sitely.app";
+    /// <summary>
+    /// The From address. Must be one the SMTP provider has authorised for a domain we own, or every
+    /// message bounces. Deliberately has no default: a plausible-looking fallback would be a domain
+    /// belonging to somebody else, and the failure only shows up as mail that silently never lands.
+    /// </summary>
+    public string FromAddress { get; set; } = "";
 
-    public string FromName { get; set; } = "Sitely";
+    /// <summary>Display name on outgoing mail. Blank sends the address alone, which is valid.</summary>
+    public string FromName { get; set; } = "";
 
     public bool IsConfigured => !string.IsNullOrWhiteSpace(SmtpHost);
 }

@@ -24,6 +24,34 @@ public class HostClassificationTests
     }
 
     [Theory]
+    [InlineData("send")]
+    [InlineData("mail")]
+    [InlineData("smtp")]
+    [InlineData("bounces")]
+    public void Labels_carrying_mail_dns_records_are_never_tenants(string label)
+    {
+        // These names hold real MX, SPF and DKIM records — Resend's verification puts them on
+        // "send". A DNS wildcard does not answer for a name that already has records, so a tenant
+        // handed one of these would resolve to mail infrastructure or to nothing at all.
+        Assert.Equal(HostKind.Platform, HostClassification.Classify($"{label}.platform.com", Options).Kind);
+    }
+
+    [Theory]
+    [InlineData("login")]
+    [InlineData("signin")]
+    [InlineData("account")]
+    [InlineData("billing")]
+    [InlineData("secure")]
+    [InlineData("verify")]
+    [InlineData("password")]
+    public void Labels_that_impersonate_the_platform_are_never_tenants(string label)
+    {
+        // Anyone can sign up. A subdomain that reads as us asking for credentials, served under our
+        // certificate, is a phishing address we would be handing out.
+        Assert.Equal(HostKind.Platform, HostClassification.Classify($"{label}.platform.com", Options).Kind);
+    }
+
+    [Theory]
     [InlineData("acme.platform.com", "acme")]
     [InlineData("ACME.platform.com", "acme")]
     [InlineData("joes-plumbing.platform.com", "joes-plumbing")]

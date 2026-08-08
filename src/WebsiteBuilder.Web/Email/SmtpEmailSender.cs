@@ -24,7 +24,9 @@ public sealed class SmtpEmailSender(IOptions<EmailOptions> options, ILogger<Smtp
 
         using var mail = new MailMessage
         {
-            From = new MailAddress(_options.FromAddress, _options.FromName),
+            From = string.IsNullOrWhiteSpace(_options.FromName)
+                ? new MailAddress(_options.FromAddress)
+                : new MailAddress(_options.FromAddress, _options.FromName),
             Subject = message.Subject,
             Body = message.TextBody,
             IsBodyHtml = false,

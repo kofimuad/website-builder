@@ -8,7 +8,7 @@ public sealed class PlatformOptions
     public const string SectionName = "Platform";
 
     /// <summary>
-    /// Absolute base URL of the builder app, e.g. "https://sitely.app". Blank means "work it out
+    /// Absolute base URL of the builder app, e.g. "https://csbuild.app". Blank means "work it out
     /// from the current request", which is right locally but should be set in production so links
     /// in email are correct even when generated behind a proxy.
     /// </summary>

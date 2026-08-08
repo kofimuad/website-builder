@@ -1,0 +1,93 @@
+@using Microsoft.AspNetCore.Components.Forms
+@using WebsiteBuilder.Core.SiteModel
+@using WebsiteBuilder.Web.Images
+
+@* One picture slot: add, replace, remove. Rendered only where an image store exists. *@
+
+<div class="img">
+    @if (!string.IsNullOrWhiteSpace(Url))
+    {
+        <img class="img-thumb" src="@ImageDelivery.Cropped(Url, 560, 320)" alt="" />
+    }
+
+    <div class="img-row">
+        <label class="img-pick @(_busy ? "busy" : "")">
+            <InputFile OnChange="UploadAsync" accept="image/*" disabled="@_busy" />
+            <span>@ButtonLabel</span>
+        </label>
+
+        @if (!string.IsNullOrWhiteSpace(Url) && !_busy)
+        {
+            <button type="button" class="img-drop" @onclick="RemoveAsync">Remove</button>
+        }
+    </div>
+
+    @if (_error is not null)
+    {
+        <p class="img-error" role="alert">@_error</p>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string? Url { get; set; }
+    [Parameter] public EventCallback<string?> UrlChanged { get; set; }
+    [Parameter, EditorRequired] public IImageStore Store { get; set; } = default!;
+    [Parameter, EditorRequired] public Guid TenantId { get; set; }
+    [Parameter] public string AddLabel { get; set; } = "Add a photo";
+
+    private bool _busy;
+    private string? _error;
+
+    private string ButtonLabel => _busy
+        ? "Uploading…"
+        : string.IsNullOrWhiteSpace(Url) ? AddLabel : "Replace photo";
+
+    private async Task UploadAsync(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file is null)
+        {
+            return;
+        }
+
+        _busy = true;
+        _error = null;
+
+        try
+        {
+            if (file.Size > Store.MaxBytes)
+            {
+                // Said in megabytes, because "12582912 bytes" is not a number anyone can act on.
+                _error = $"That photo is too large. The largest we can take is {Store.MaxBytes / (1024 * 1024)} MB.";
+                return;
+            }
+
+            await using var stream = file.OpenReadStream(Store.MaxBytes);
+            var stored = await Store.UploadAsync(stream, file.Name, file.ContentType, TenantId);
+
+            Url = stored.Url;
+            await UrlChanged.InvokeAsync(stored.Url);
+        }
+        catch (ImageUploadException ex)
+        {
+            _error = ex.Message;
+        }
+        catch (Exception)
+        {
+            _error = "That photo didn't upload. Please try again.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task RemoveAsync()
+    {
+        // The file stays at the provider. Removing it here only detaches it from the section, so an
+        // accidental click is recoverable and a published site never loses an image mid-request.
+        Url = null;
+        _error = null;
+        await UrlChanged.InvokeAsync(null);
+    }
+}

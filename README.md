@@ -49,8 +49,26 @@ dotnet user-secrets set "ANTHROPIC_API_KEY" "sk-ant-…"        --project src/We
 dotnet user-secrets set "Auth:GoogleClientId" "…"             --project src/WebsiteBuilder.Web
 dotnet user-secrets set "Auth:GoogleClientSecret" "…"         --project src/WebsiteBuilder.Web
 dotnet user-secrets set "Email:SmtpHost" "smtp.resend.com"    --project src/WebsiteBuilder.Web
+dotnet user-secrets set "Images:CloudName" "…"                --project src/WebsiteBuilder.Web
+dotnet user-secrets set "Images:ApiKey" "…"                   --project src/WebsiteBuilder.Web
+dotnet user-secrets set "Images:ApiSecret" "…"                --project src/WebsiteBuilder.Web
 dotnet user-secrets list --project src/WebsiteBuilder.Web     # check what is set
 ```
+
+### Photos
+
+Photo uploads go to Cloudinary. `Images:CloudName`, `Images:ApiKey` and `Images:ApiSecret` must
+all be set or all be left unset — half-configured refuses to start, because the only symptom would
+be an editor that never shows the upload button.
+
+Without them everything still works: the editor simply does not offer uploads, exactly as the
+per-section assistant does not exist without a model key.
+
+Uploads are signed server-side rather than using an unsigned preset, so size and type limits are
+enforced here before anything reaches the provider. Images are **resized on delivery**, not on
+upload — the original is stored once and `ImageDelivery` rewrites the URL for the size each slot
+needs. A URL from anywhere else is passed through untouched, so sites built before uploads existed
+keep rendering.
 
 With `ANTHROPIC_API_KEY` set, Claude writes the site copy and the deterministic template becomes
 the fallback for when the model fails; the per-section AI assistant in the editor also appears,
@@ -90,12 +108,16 @@ Deployed on Railway from `main`. The service needs:
 | Variable                             | Notes                                                        |
 | ------------------------------------ | ------------------------------------------------------------ |
 | `DATABASE_URL`                       | Reference the Postgres service, e.g. `${{Postgres.DATABASE_URL}}` |
-| `TenantResolution__PlatformDomain`   | The domain tenant subdomains hang off. Defaults to `localhost` |
-| `Platform__PublicBaseUrl`            | Absolute URL of the builder, e.g. `https://sitely.app`. Links in email are built from it |
+| `TenantResolution__PlatformDomain`   | The domain tenant subdomains hang off — `csbuild.app`. Defaults to `localhost`, and left at the default every real host 404s |
+| `Platform__PublicBaseUrl`            | Absolute URL of the builder, `https://csbuild.app`. Links in email are built from it |
 | `Email__SmtpHost`                    | Leave unset and email is logged, not sent — sign-in becomes unusable in production |
 | `Email__SmtpPort`                    | Defaults to 587                                               |
-| `Email__SmtpUser` / `Email__SmtpPassword` | Provider credentials                                     |
-| `Email__FromAddress`                 | Must be an address the provider has authorised, or mail bounces |
+| `Email__SmtpUser` / `Email__SmtpPassword` | Provider credentials. On Resend the user is literally `resend` and the password is the API key |
+| `Email__FromAddress`                 | **Required** once `SmtpHost` is set — startup fails without it. Must be on a domain the provider has verified |
+| `Email__FromName`                    | Optional display name. Blank sends the address alone           |
+| `Images__CloudName`                  | Cloudinary account. All three image variables must be set together, or none |
+| `Images__ApiKey`                     | Optional as a group. Without them the editor offers no photo uploads |
+| `Images__ApiSecret`                  | Uploads are signed with this server-side — it must never reach the browser |
 | `Auth__GoogleClientId`               | Optional. Both Google variables must be set for the button to appear |
 | `Auth__GoogleClientSecret`           | Optional                                                      |
 | `ANTHROPIC_API_KEY`                  | Optional. Without it, sites use the deterministic template generator |
@@ -105,3 +127,51 @@ an empty string rather than being absent.
 
 **`Email__SmtpHost` is effectively required in production.** Sign-in is by emailed link, so with no
 mail provider nobody can get in.
+
+## Domain and DNS
+
+The platform domain is **`csbuild.app`**, registered at Cloudflare, which also hosts the DNS. The
+builder is served from the apex and every tenant site from a subdomain of it, so Railway needs
+**two** custom domains: `csbuild.app` and `*.csbuild.app`.
+
+`.app` is on the HSTS preload list, so browsers will only ever speak HTTPS to it. There is no
+working HTTP fallback while a certificate is pending — the domain is simply unreachable until the
+certificate issues, which is expected rather than a misconfiguration.
+
+### Records
+
+Adding each domain in Railway produces the values to enter; Railway gives a wildcard domain two
+CNAMEs and a TXT, and **the TXT is not optional** — a wildcard will not verify without it.
+
+| Type  | Name              | Points at                        | Proxy |
+| ----- | ----------------- | -------------------------------- | ----- |
+| CNAME | `@`               | Railway's host for `csbuild.app` | DNS only |
+| CNAME | `*`               | Railway's host for the wildcard  | DNS only |
+| CNAME | `_acme-challenge` | Railway's ACME target            | DNS only |
+| TXT   | (per Railway)     | Railway's ownership token        | —     |
+
+Every record stays **DNS only** — the grey cloud, not the orange one. Proxying breaks certificate
+issuance for the wildcard unless the account has Cloudflare's Advanced Certificate Manager, because
+Cloudflare's free wildcard certificate covers one label and the ACME challenge is intercepted.
+Cloudflare flattens the apex CNAME on its own, so a CNAME at `@` is fine.
+
+### Reserved subdomains
+
+`TenantResolutionOptions.ReservedSubdomains` is not cosmetic. A DNS wildcard only answers for names
+that have no records of their own, so **any label given its own record stops being covered by `*`**
+— a tenant handed that name would resolve to infrastructure or to nothing. Mail verification puts
+records on `send`, which is why it is reserved. The list also holds names that read as platform
+functions (`login`, `billing`, `secure`, …): anyone can sign up, and a phishing page under our own
+certificate is worse than a customer not getting their first choice of address. Both tenant
+resolution and subdomain suggestion read the one list, so reserving a name blocks it everywhere.
+
+### Mail
+
+Resend verifies `csbuild.app` and sends from `no-reply@csbuild.app`. Verification needs an MX and a
+TXT (SPF) on `send`, plus a TXT on `resend._domainkey` — all DNS only. Enter the names **without**
+the domain suffix: Cloudflare appends it, so `send`, not `send.csbuild.app`.
+
+Resend recommends a dedicated sending subdomain to isolate reputation, which matters once marketing
+mail exists. It does not yet — the only mail is sign-in links and lead notifications, and a sign-in
+link from the bare domain is the more trustworthy thing for an owner to receive. If bulk sending is
+added later, verify `updates.csbuild.app` separately and leave transactional mail where it is.

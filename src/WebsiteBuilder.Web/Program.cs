@@ -13,6 +13,7 @@ using WebsiteBuilder.Web.Components;
 using WebsiteBuilder.Web.Development;
 using WebsiteBuilder.Web.Email;
 using WebsiteBuilder.Web.Generation;
+using WebsiteBuilder.Web.Images;
 using WebsiteBuilder.Web.Management;
 using WebsiteBuilder.Web.Middleware;
 using WebsiteBuilder.Web.Onboarding;
@@ -68,11 +69,44 @@ builder.Services.AddScoped<OnboardingDraftStore>();
 var emailOptions = builder.Configuration.GetSection(EmailOptions.SectionName).Get<EmailOptions>() ?? new EmailOptions();
 if (emailOptions.IsConfigured)
 {
+    // A provider with no From address sends nothing anybody receives, and the symptom is silence:
+    // sign-in links that were "sent" and never arrive. Refuse to start instead.
+    if (string.IsNullOrWhiteSpace(emailOptions.FromAddress))
+    {
+        throw new InvalidOperationException(
+            "Email:SmtpHost is set but Email:FromAddress is empty. Set it to an address on a domain " +
+            "the provider has verified for us, e.g. no-reply@ourdomain.com — mail from an " +
+            "unverified domain bounces.");
+    }
+
     builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
 }
 else
 {
     builder.Services.AddScoped<IEmailSender, LogEmailSender>();
+}
+
+// Photo uploads (WB-23). Cloudinary keeps the original and resizes on delivery, so the editor
+// stores a URL and each slot asks for the size it needs. Without credentials the editor offers no
+// uploads at all, the same way the assistant does not exist without a model key.
+builder.Services.Configure<ImageOptions>(builder.Configuration.GetSection(ImageOptions.SectionName));
+var imageOptions = builder.Configuration.GetSection(ImageOptions.SectionName).Get<ImageOptions>() ?? new ImageOptions();
+
+// Half-configured is the dangerous state: uploads would be silently absent, and the only symptom
+// is an editor that never shows the button. Refusing to start beats hunting for that later.
+if (imageOptions.IsPartiallyConfigured)
+{
+    throw new InvalidOperationException(
+        "Images: CloudName, ApiKey and ApiSecret must all be set, or all be left unset. Set them " +
+        "with: dotnet user-secrets set \"Images:ApiSecret\" \"…\" --project src/WebsiteBuilder.Web");
+}
+
+if (imageOptions.IsConfigured)
+{
+    builder.Services.AddHttpClient<IImageStore, CloudinaryImageStore>(client =>
+        // A 12 MB photo over a phone connection is slow but not broken; the default 100 s would
+        // give up on uploads that were going to succeed.
+        client.Timeout = TimeSpan.FromMinutes(3));
 }
 
 var authOptions = builder.Configuration.GetSection(AuthOptions.SectionName).Get<AuthOptions>() ?? new AuthOptions();
@@ -166,10 +200,27 @@ builder.Services.AddOutputCache(options =>
 var app = builder.Build();
 
 // Which generator is live is otherwise invisible until someone notices the copy reads generically.
+var tenantOptions = builder.Configuration.GetSection(TenantResolutionOptions.SectionName).Get<TenantResolutionOptions>()
+    ?? new TenantResolutionOptions();
+
 app.Logger.LogInformation(
-    "Site generation: {Generator}. Per-section assistant: {Assistant}.",
+    "Tenant subdomains hang off {PlatformDomain}. Site generation: {Generator}. " +
+    "Per-section assistant: {Assistant}. Photo uploads: {Images}.",
+    tenantOptions.PlatformDomain,
     string.IsNullOrWhiteSpace(anthropicKey) ? "template only" : "Claude, template fallback",
-    string.IsNullOrWhiteSpace(anthropicKey) ? "unavailable" : "available");
+    string.IsNullOrWhiteSpace(anthropicKey) ? "unavailable" : "available",
+    imageOptions.IsConfigured ? $"Cloudinary ({imageOptions.CloudName})" : "unavailable");
+
+// Deployed with the default, every real host classifies as an unmapped custom domain and the whole
+// platform answers 404 — including the marketing page. Warned rather than thrown because the test
+// host boots in Production without a domain and has no tenants to resolve.
+if (!app.Environment.IsDevelopment() && tenantOptions.PlatformDomain is "localhost")
+{
+    app.Logger.LogWarning(
+        "TenantResolution:PlatformDomain is still \"localhost\" outside Development. Every request " +
+        "to a real host name will 404 as an unmapped custom domain. Set it to the domain tenant " +
+        "subdomains hang off, e.g. TenantResolution__PlatformDomain=csbuild.app.");
+}
 
 // Railway has no separate release phase, so pending migrations are applied on boot.
 if (app.Configuration.GetValue("RunMigrationsOnStartup", true))

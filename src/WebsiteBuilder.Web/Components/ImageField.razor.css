@@ -1,0 +1,75 @@
+.img {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.img-thumb {
+    display: block;
+    width: 100%;
+    max-width: 280px;
+    aspect-ratio: 7 / 4;
+    object-fit: cover;
+    border-radius: 10px;
+    background: var(--tile2);
+}
+
+.img-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+/* The real input is hidden behind the label so the control can be styled, but it stays in the
+   accessibility tree and keeps its own keyboard behaviour. */
+.img-pick {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 13px;
+    border-radius: 8px;
+    border: 1px dashed #55555F;
+    background: transparent;
+    color: #F2F2F5;
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.img-pick:hover { border-color: var(--accent); }
+.img-pick.busy { opacity: .65; cursor: default; }
+
+.img-pick ::deep input[type="file"] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    overflow: hidden;
+}
+
+.img-pick:focus-within {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.img-drop {
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid #3A3A42;
+    background: transparent;
+    color: var(--fg-muted);
+    font-family: var(--font-body);
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.img-drop:hover { color: #F2F2F5; border-color: #55555F; }
+
+.img-error {
+    margin: 0;
+    font-size: 13px;
+    color: #FFB4AB;
+}
