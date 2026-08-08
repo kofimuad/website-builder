@@ -1,4 +1,5 @@
 @page "/start"
+@using WebsiteBuilder.Core.Generation
 @using WebsiteBuilder.Core.Onboarding
 @using WebsiteBuilder.Web.Auth
 @using WebsiteBuilder.Web.Onboarding
@@ -289,8 +290,10 @@
         ? "Build my website"
         : OnboardingWizard.IsOptional(_wizard.CurrentStep) ? "Skip" : "Continue";
 
-    private static readonly string[] CategorySuggestions =
-        ["Plumbing", "Bakery", "Salon & spa", "Cleaning", "Electrician"];
+    // Straight from the category catalog, so a template added there shows up here. Free text still
+    // works — these exist so the common cases land on a curated page without the owner having to
+    // guess our wording.
+    private static IReadOnlyList<string> CategorySuggestions => CategoryTemplateCatalog.Examples;
 
     private string PreviewBrand => string.IsNullOrWhiteSpace(_wizard.Answers.BusinessName)
         ? "Rapid Flow Plumbing"

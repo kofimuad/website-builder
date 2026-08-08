@@ -5,8 +5,9 @@ namespace WebsiteBuilder.Core.Generation;
 
 /// <summary>
 /// Builds a site from the profile using fixed copy patterns — no model call, no network, same
-/// output every time. Claude replaces the wording in WB-3; the section choices made here are the
-/// structure that generation is expected to produce.
+/// output every time. Only the wording is decided here: which sections a page has, in what order,
+/// under what headings, and with which photographs all come from the business category's template
+/// via <see cref="SitePlanBuilder"/>, exactly as they do on the Claude path.
 /// </summary>
 public sealed class TemplateSiteGenerator : ISiteGenerator
 {
@@ -26,11 +27,23 @@ public sealed class TemplateSiteGenerator : ISiteGenerator
         {
             Meta = meta,
             Theme = theme,
-            Sections = BuildSections(profile),
+            Sections = SitePlanBuilder.Build(CategoryTemplateCatalog.Match(profile.Category), profile, Copy(profile)),
         };
 
         return Task.FromResult(definition);
     }
+
+    /// <summary>
+    /// Fixed copy patterns. No service descriptions: the template has nothing to say about
+    /// "Drain clearing" that the title does not already say, and inventing something would be
+    /// worse than the blank the owner can fill in.
+    /// </summary>
+    private static SiteCopy Copy(BusinessProfile profile) => new(
+        HeroHeadline: BuildHeadline(profile),
+        HeroSubheadline: BuildSubheadline(profile),
+        AboutBody: BuildAbout(profile),
+        CtaHeadline: BuildClosingLine(profile),
+        CtaButtonLabel: ContactActions.DefaultLabel(profile.PrimaryAction));
 
     private static SiteMeta BuildMeta(BusinessProfile profile)
     {
@@ -59,65 +72,6 @@ public sealed class TemplateSiteGenerator : ISiteGenerator
     }
 
     private static SiteTheme BuildTheme(BusinessTone tone) => ThemePresets.For(tone);
-
-    private static List<SiteSection> BuildSections(BusinessProfile profile)
-    {
-        var sections = new List<SiteSection>
-        {
-            new HeroSection
-            {
-                Headline = BuildHeadline(profile),
-                Subheadline = BuildSubheadline(profile),
-                CallToActionLabel = ContactActions.DefaultLabel(profile.PrimaryAction),
-                CallToActionUrl = ContactActions.ResolveUrl(profile),
-            },
-            new AboutSection
-            {
-                Heading = $"About {profile.BusinessName}",
-                Body = BuildAbout(profile),
-            },
-        };
-
-        // Only offer sections the profile can actually fill: an empty heading with nothing under
-        // it looks broken, and the owner would have to delete it by hand.
-        if (profile.Offerings.Count > 0)
-        {
-            sections.Add(new ServicesSection
-            {
-                Heading = "What we do",
-                Items = profile.Offerings
-                    .Select(offering => new ServiceItem { Title = offering, Description = "" })
-                    .ToList(),
-            });
-        }
-
-        if (profile.AddressLines.Count > 0)
-        {
-            sections.Add(new HoursMapSection
-            {
-                Heading = "Find us",
-                AddressLines = [.. profile.AddressLines],
-                MapQuery = string.Join(", ", profile.AddressLines),
-            });
-        }
-
-        sections.Add(new ContactSection
-        {
-            Heading = "Get in touch",
-            PhoneNumber = profile.PhoneNumber,
-            WhatsAppNumber = profile.WhatsAppNumber,
-            Email = profile.Email,
-        });
-
-        sections.Add(new CtaSection
-        {
-            Headline = BuildClosingLine(profile),
-            ButtonLabel = ContactActions.DefaultLabel(profile.PrimaryAction),
-            ButtonUrl = ContactActions.ResolveUrl(profile),
-        });
-
-        return sections;
-    }
 
     private static string BuildHeadline(BusinessProfile profile) => profile.Tone switch
     {

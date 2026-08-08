@@ -1,6 +1,8 @@
 using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using WebsiteBuilder.Core.Entities;
+using WebsiteBuilder.Core.Generation;
+using WebsiteBuilder.Core.Onboarding;
 using WebsiteBuilder.Core.SiteModel;
 using WebsiteBuilder.Core.Tenancy;
 using WebsiteBuilder.Data;
@@ -96,6 +98,33 @@ public class SiteRendererTests(PostgresFixture fixture) : IDisposable
         Assert.Contains("<title>Joe's Plumbing — Accra</title>", html);
         Assert.Contains("Emergency plumbing across Accra", html);
         Assert.Contains("width=device-width", html);
+    }
+
+    [Fact]
+    public async Task A_generated_category_site_renders_its_stock_photography()
+    {
+        // The catalog is only worth having if the photographs survive generation, storage as jsonb,
+        // publishing and the renderer. Everything else about categories is unit-tested; this is the
+        // one check that a visitor actually sees them.
+        var definition = await new TemplateSiteGenerator().GenerateAsync(new BusinessProfile
+        {
+            BusinessName = "Auntie Akos Kitchen",
+            Category = "chop bar",
+            Offerings = ["Jollof and chicken"],
+            PhoneNumber = "+233200000000",
+            AddressLines = ["12 High Street, Osu"],
+        });
+
+        var (subdomain, _, _) = await SeedSiteAsync(definition: definition);
+
+        var html = Decode(await CreateClient().GetStringAsync($"http://{subdomain}.platform.com/"));
+
+        Assert.Contains("Our menu", html);
+        Assert.Contains("From the kitchen", html);
+        Assert.Contains("images.unsplash.com", html);
+        Assert.Contains("alt=\"Three dishes laid out on a wooden table\"", html);
+        // The renderer must not have rewritten a non-Cloudinary URL on the way through.
+        Assert.Contains("w=1600&h=900", html);
     }
 
     [Fact]

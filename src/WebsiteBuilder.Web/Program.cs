@@ -79,6 +79,16 @@ if (emailOptions.IsConfigured)
             "unverified domain bounces.");
     }
 
+    // SmtpEmailSender uses System.Net.Mail, which can only start TLS on a plaintext connection.
+    // It cannot speak implicit TLS, which is the whole point of 465 — so a send there does not
+    // fail cleanly, it hangs until the timeout and looks like the provider ignoring us.
+    if (emailOptions.SmtpPort == 465)
+    {
+        throw new InvalidOperationException(
+            "Email:SmtpPort is 465, which this app cannot use: it sends with System.Net.Mail, and " +
+            "that only supports STARTTLS, not implicit TLS. Use 587 (Resend also accepts 2587).");
+    }
+
     builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
 }
 else

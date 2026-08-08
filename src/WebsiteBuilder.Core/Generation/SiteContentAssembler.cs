@@ -26,76 +26,37 @@ public static class SiteContentAssembler
                 SeoDescription = NullIfBlank(content.SeoDescription),
             },
             Theme = ThemePresets.For(ThemePresets.ParsePalette(content.Palette)),
-            Sections = BuildSections(content, profile),
+            Sections = SitePlanBuilder.Build(
+                CategoryTemplateCatalog.Match(profile.Category),
+                profile,
+                Copy(content, profile)),
         };
     }
 
-    private static List<SiteSection> BuildSections(GeneratedSiteContent content, BusinessProfile profile)
-    {
-        var sections = new List<SiteSection>
-        {
-            new HeroSection
-            {
-                Headline = content.HeroHeadline,
-                Subheadline = content.HeroSubheadline,
-                CallToActionLabel = FirstNonBlank(content.CtaButtonLabel, ContactActions.DefaultLabel(profile.PrimaryAction)),
-                CallToActionUrl = ContactActions.ResolveUrl(profile),
-            },
-            new AboutSection
-            {
-                Heading = FirstNonBlank(content.AboutHeading, $"About {profile.BusinessName}"),
-                Body = content.AboutBody,
-            },
-        };
+    /// <summary>
+    /// Everything the model is allowed to decide, and nothing else. Service titles are the owner's
+    /// own words from the profile — the model supplies only the description for each, matched back
+    /// by title so a reordered or recased response cannot shuffle them.
+    /// </summary>
+    private static SiteCopy Copy(GeneratedSiteContent content, BusinessProfile profile) => new(
+        HeroHeadline: content.HeroHeadline,
+        HeroSubheadline: content.HeroSubheadline,
+        AboutBody: content.AboutBody,
+        CtaHeadline: FirstNonBlank(content.CtaHeadline, $"Ready to get started with {profile.BusinessName}?"),
+        CtaButtonLabel: FirstNonBlank(content.CtaButtonLabel, ContactActions.DefaultLabel(profile.PrimaryAction)),
+        AboutHeading: content.AboutHeading,
+        ServiceDescriptions: DescriptionsByTitle(content));
 
-        // Titles are the owner's own words, taken from the profile — never from the model.
-        // The model only supplies the description for each.
-        if (profile.Offerings.Count > 0)
+    private static Dictionary<string, string> DescriptionsByTitle(GeneratedSiteContent content)
+    {
+        var descriptions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var service in content.Services)
         {
-            sections.Add(new ServicesSection
-            {
-                Heading = "What we do",
-                Items = profile.Offerings
-                    .Select(title => new ServiceItem { Title = title, Description = DescriptionFor(title, content) })
-                    .ToList(),
-            });
+            descriptions[service.Title.Trim()] = service.Description;
         }
 
-        if (profile.AddressLines.Count > 0)
-        {
-            sections.Add(new HoursMapSection
-            {
-                Heading = "Find us",
-                AddressLines = [.. profile.AddressLines],
-                MapQuery = string.Join(", ", profile.AddressLines),
-            });
-        }
-
-        sections.Add(new ContactSection
-        {
-            Heading = "Get in touch",
-            PhoneNumber = profile.PhoneNumber,
-            WhatsAppNumber = profile.WhatsAppNumber,
-            Email = profile.Email,
-        });
-
-        sections.Add(new CtaSection
-        {
-            Headline = FirstNonBlank(content.CtaHeadline, $"Ready to get started with {profile.BusinessName}?"),
-            ButtonLabel = FirstNonBlank(content.CtaButtonLabel, ContactActions.DefaultLabel(profile.PrimaryAction)),
-            ButtonUrl = ContactActions.ResolveUrl(profile),
-        });
-
-        return sections;
-    }
-
-    /// <summary>Matches the model's description to a title, preferring an exact title match then position.</summary>
-    private static string DescriptionFor(string title, GeneratedSiteContent content)
-    {
-        var byTitle = content.Services
-            .FirstOrDefault(s => string.Equals(s.Title.Trim(), title.Trim(), StringComparison.OrdinalIgnoreCase));
-
-        return byTitle?.Description ?? "";
+        return descriptions;
     }
 
     private static string FirstNonBlank(string preferred, string fallback) =>

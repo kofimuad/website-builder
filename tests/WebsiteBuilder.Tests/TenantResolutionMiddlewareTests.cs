@@ -21,6 +21,14 @@ public sealed class TenantAppFactory(PostgresFixture fixture) : WebApplicationFa
         {
             ["ConnectionStrings:Default"] = fixture.ConnectionString,
             ["TenantResolution:PlatformDomain"] = "platform.com",
+
+            // Every test that completes onboarding through this host would otherwise make a real,
+            // billed Claude request — the Development environment loads the developer's user
+            // secrets, and ANTHROPIC_API_KEY lives there. Blanking it selects TemplateSiteGenerator,
+            // which is deterministic and free. Nothing is lost: the Claude path is covered by
+            // SiteGenerationTests and SectionAssistantTests with scripted IClaudeJsonCompletion
+            // fakes, which exercise it far more precisely than a live call would.
+            ["ANTHROPIC_API_KEY"] = "",
         }));
 
         return base.CreateHost(builder);

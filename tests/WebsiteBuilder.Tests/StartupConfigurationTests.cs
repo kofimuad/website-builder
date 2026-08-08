@@ -69,6 +69,44 @@ public class StartupConfigurationTests
         Assert.Contains("Email:FromAddress", exception.Message);
     }
 
+    [Fact]
+    public void An_implicit_tls_smtp_port_stops_the_app()
+    {
+        // System.Net.Mail cannot speak implicit TLS, so a send on 465 hangs until it times out
+        // rather than failing — which reads as the provider being at fault.
+        using var factory = new ConfiguredAppFactory(new Dictionary<string, string?>
+        {
+            ["DATABASE_URL"] = "postgresql://u:p@127.0.0.1:1/db",
+            ["RunMigrationsOnStartup"] = "false",
+            ["Email:SmtpHost"] = "smtp.resend.com",
+            ["Email:FromAddress"] = "no-reply@csbuild.app",
+            ["Email:SmtpPort"] = "465",
+        });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("587", exception.Message);
+    }
+
+    [Fact]
+    public void The_starttls_submission_port_is_accepted()
+    {
+        using var factory = new ConfiguredAppFactory(new Dictionary<string, string?>
+        {
+            ["DATABASE_URL"] = "postgresql://u:p@127.0.0.1:1/db",
+            ["RunMigrationsOnStartup"] = "false",
+            ["Email:SmtpHost"] = "smtp.resend.com",
+            ["Email:FromAddress"] = "no-reply@csbuild.app",
+            ["Email:SmtpPort"] = "587",
+        });
+
+        var exception = Record.Exception(() => factory.CreateClient());
+
+        Assert.True(
+            exception is null || !exception.Message.Contains("SmtpPort"),
+            $"Startup rejected the standard submission port: {exception?.Message}");
+    }
+
     [Theory]
     [InlineData("Images:CloudName")]
     [InlineData("Images:ApiKey")]

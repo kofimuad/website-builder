@@ -75,6 +75,10 @@ the fallback for when the model fails; the per-section AI assistant in the edito
 since it only exists when the model does. Without the key everything still works — sites are built
 from the template and the assistant is hidden.
 
+Either way the *shape* of the site comes from the business category, not from the model: what the
+owner types on the first onboarding step is matched against `CategoryTemplateCatalog`, which decides
+the sections, their headings and the stock photography a site starts with.
+
 Chrome, Edge and Firefox resolve any `*.localhost` name to 127.0.0.1 on their own. If your browser
 does not, add `127.0.0.1 joesplumbing.localhost` to `C:\Windows\System32\drivers\etc\hosts`.
 
