@@ -41,16 +41,21 @@ public sealed class ProductsService(WebsiteBuilderDbContext db)
     }
 
     /// <summary>
-    /// Saves an edit. The slug follows the name only while nothing links to the old one — see
-    /// <see cref="UniqueSlugAsync"/> — because a product address may already be in a customer's
-    /// WhatsApp history.
+    /// Saves an edit.
+    /// <para>
+    /// The address follows the name. It has to: a product added from the button starts as
+    /// "New item", so keeping the original slug left everything the owner ever renamed sitting at
+    /// <c>/products/new-item-2</c>. The site's own links are always built from the current slug, so
+    /// nothing internal breaks; the cost is that a link shared before a rename stops working, which
+    /// is the better of the two bad outcomes while a catalog is being set up.
+    /// </para>
     /// </summary>
     public async Task SaveAsync(Product product, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(product);
 
         product.Name = string.IsNullOrWhiteSpace(product.Name) ? "New item" : product.Name.Trim();
-        product.Slug = await UniqueSlugAsync(product.Slug, product.Id, cancellationToken);
+        product.Slug = await UniqueSlugAsync(product.Name, product.Id, cancellationToken);
         product.Currency = string.IsNullOrWhiteSpace(product.Currency) ? "GHS" : product.Currency.Trim().ToUpperInvariant();
         product.UpdatedUtc = DateTimeOffset.UtcNow;
 

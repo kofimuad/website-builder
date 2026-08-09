@@ -23,6 +23,9 @@ public class SitePreviewModel(WebsiteBuilderDbContext db) : PageModel
 {
     public SiteDefinition? Draft { get; private set; }
 
+    /// <summary>Needed by the view to keep nav anchors inside the preview.</summary>
+    public Guid SiteId { get; private set; }
+
     /// <summary>The tenant's live catalog, so a shop section previews with the real products in it.</summary>
     public IReadOnlyList<Product> Products { get; private set; } = [];
 
@@ -53,6 +56,7 @@ public class SitePreviewModel(WebsiteBuilderDbContext db) : PageModel
         }
 
         Draft = found.Draft;
+        SiteId = siteId;
 
         var shop = Draft.Sections.OfType<ShopSection>().FirstOrDefault(s => s.Visible);
         if (shop is not null)

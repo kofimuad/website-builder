@@ -13,11 +13,18 @@ namespace WebsiteBuilder.Web.Pages;
 /// </summary>
 public sealed class SiteChrome
 {
-    public SiteChrome(SiteDefinition definition)
+    /// <param name="homePath">
+    /// Where "home" is from the page being rendered. Nav links are anchors on the home page, so
+    /// they have to be written relative to it: on the preview page that is the preview's own URL,
+    /// and writing them as "/#services" there navigated the owner off the preview and onto the
+    /// marketing site. On a tenant host it is simply "/".
+    /// </param>
+    public SiteChrome(SiteDefinition definition, string homePath = "/")
     {
         ArgumentNullException.ThrowIfNull(definition);
 
         Definition = definition;
+        HomePath = string.IsNullOrWhiteSpace(homePath) ? "/" : homePath;
         Visible = definition.Sections.Where(s => s.Visible).ToList();
 
         Anchors = BuildAnchors(Visible);
@@ -39,8 +46,13 @@ public sealed class SiteChrome
     public string HeadingStack { get; }
     public string BodyStack { get; }
 
+    public string HomePath { get; }
+
     public SiteTheme Theme => Definition.Theme;
     public string BusinessName => Definition.Meta.BusinessName;
+
+    /// <summary>The href for a section link. Same-document when the page already is the home page.</summary>
+    public string NavHref(string anchor) => $"{HomePath}#{anchor}";
 
     public bool HasCallBar => Contact is not null
         && (!string.IsNullOrWhiteSpace(Contact.PhoneNumber) || !string.IsNullOrWhiteSpace(Contact.WhatsAppNumber));

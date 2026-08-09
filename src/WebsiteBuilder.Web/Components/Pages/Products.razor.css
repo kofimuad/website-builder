@@ -30,7 +30,10 @@
 .pp-card.off { opacity: .62; }
 .pp-card.empty { text-align: center; color: var(--fg2); }
 
-.pp-row { display: grid; grid-template-columns: 140px 1fr auto; gap: 18px; align-items: start; }
+/* min-content on the last column, or the Remove button is given no width of its own and lands on
+   top of the name field. min-width:0 on the middle column is what lets the inputs shrink instead
+   of pushing it there. */
+.pp-row { display: grid; grid-template-columns: 140px minmax(0, 1fr) min-content; gap: 18px; align-items: start; }
 .pp-fields { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 
 .field {
@@ -51,7 +54,8 @@
 
 .drop {
     border: 0; background: none; color: var(--fg-muted); cursor: pointer;
-    font-family: var(--font-body); font-size: 14px; text-decoration: underline; padding: 4px;
+    font-family: var(--font-body); font-size: 14px; text-decoration: underline;
+    padding: 10px 4px; white-space: nowrap;
 }
 .pp-status { margin: 0; font-size: 13px; color: var(--fg-muted); min-height: 1.2em; }
 

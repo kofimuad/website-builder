@@ -3,15 +3,16 @@
 @*
     The header every page of a tenant site carries — the home page and every shop page alike.
 
-    Nav targets are written as "/#services" rather than "#services" so the same link works from
-    /shop and /cart, where the anchor is on another page.
+    Nav targets are written relative to SiteChrome.HomePath, because the anchors live on the home
+    page: "/#services" from /cart, but the preview's own URL when previewing, or the owner clicking
+    a nav link is thrown out of the preview and onto the marketing site.
 *@
 <nav class="topbar">
-    <a class="topbar-brand" href="/">@Model.BusinessName</a>
+    <a class="topbar-brand" href="@Model.HomePath">@Model.BusinessName</a>
     <span class="topbar-links">
         @foreach (var link in Model.NavLinks)
         {
-            <a href="/#@link.Anchor">@link.Label</a>
+            <a href="@Model.NavHref(link.Anchor)">@link.Label</a>
         }
     </span>
     @if (Model.Hero is { CallToActionLabel: { Length: > 0 } label, CallToActionUrl: { Length: > 0 } url })

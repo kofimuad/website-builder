@@ -1,4 +1,5 @@
 using System.Net;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using WebsiteBuilder.Core.Entities;
 using WebsiteBuilder.Core.Generation;
@@ -98,6 +99,42 @@ public class SiteRendererTests(PostgresFixture fixture) : IDisposable
         Assert.Contains("<title>Joe's Plumbing — Accra</title>", html);
         Assert.Contains("Emergency plumbing across Accra", html);
         Assert.Contains("width=device-width", html);
+    }
+
+    [Fact]
+    public async Task Preview_nav_links_stay_inside_the_preview()
+    {
+        // Nav targets are anchors on the home page. Written as "/#services" they threw the owner
+        // out of the preview and onto the marketing site the moment they clicked one.
+        var ownerId = await _factory.CreateOwnerAsync();
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var tenantContext = scope.ServiceProvider.GetRequiredService<TenantContext>();
+            var db = scope.ServiceProvider.GetRequiredService<WebsiteBuilderDbContext>();
+
+            var tenant = new Tenant { Subdomain = $"v{Guid.NewGuid():N}"[..12], Name = "Preview", OwnerId = ownerId };
+            db.Tenants.Add(tenant);
+            await db.SaveChangesAsync();
+
+            tenantContext.TenantId = tenant.Id;
+            db.Sites.Add(new Site { Name = "Site", Draft = SampleDefinition() });
+            await db.SaveChangesAsync();
+        }
+
+        Guid siteId;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<WebsiteBuilderDbContext>();
+            siteId = await db.Sites.IgnoreQueryFilters()
+                .Join(db.Tenants.Where(t => t.OwnerId == ownerId), s => s.TenantId, t => t.Id, (s, _) => s.Id)
+                .FirstAsync();
+        }
+
+        var html = Decode(await _factory.CreateClientAs(ownerId).GetStringAsync($"http://platform.com/preview/{siteId}"));
+
+        Assert.Contains($"/preview/{siteId}#contact", html);
+        Assert.DoesNotContain("href=\"/#contact\"", html);
     }
 
     [Fact]

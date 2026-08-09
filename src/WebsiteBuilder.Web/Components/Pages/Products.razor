@@ -61,11 +61,14 @@
                             @if (_images is not null)
                             {
                                 <ImageField Store="_images" TenantId="product.TenantId" AddLabel="Add a photo"
-                                            Url="product.ImageUrl"
+                                            Url="@product.ImageUrl"
                                             UrlChanged="url => { product.ImageUrl = url; Touch(product); }" />
                             }
                             <div class="pp-fields">
-                                <input class="field name" @bind="product.Name" @bind:event="oninput"
+                                @* Saved on blur, not on every keystroke: an empty name falls back
+                                   to a placeholder name, and doing that mid-edit means clearing
+                                   the field to retype it puts "New item" straight back. *@
+                                <input class="field name" @bind="product.Name"
                                        @bind:after="() => Touch(product)" placeholder="What is it called?" />
                                 <textarea class="field" rows="2" @bind="product.Description" @bind:event="oninput"
                                           @bind:after="() => Touch(product)" placeholder="A line or two about it"></textarea>
@@ -75,11 +78,13 @@
                                         <input class="field" type="text" inputmode="decimal"
                                                value="@PriceText(product)"
                                                @onchange="e => SetPrice(product, e.Value?.ToString())"
-                                               placeholder="Leave blank for &quot;ask us&quot;" />
+                                               placeholder="@("Leave blank for \"ask us\"")" />
                                     </label>
                                     <label>
                                         Currency
-                                        <input class="field short" @bind="product.Currency" @bind:event="oninput"
+                                        @* Also on blur: this is upper-cased and defaulted on save,
+                                           which fights you if it happens between keystrokes. *@
+                                        <input class="field short" @bind="product.Currency"
                                                @bind:after="() => Touch(product)" maxlength="3" />
                                     </label>
                                     <label class="pp-toggle">

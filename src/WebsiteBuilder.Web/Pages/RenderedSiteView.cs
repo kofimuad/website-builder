@@ -11,10 +11,11 @@ namespace WebsiteBuilder.Web.Pages;
 /// the definition rather than read out of it.
 /// </para>
 /// </summary>
+/// <param name="HomePath">
+/// Where the page being rendered considers "home" — "/" on a tenant host, the preview's own URL
+/// when previewing. Nav links are anchors on the home page, so they are written relative to it.
+/// </param>
 public sealed record RenderedSiteView(
     SiteDefinition Definition,
-    IReadOnlyList<Product> Products)
-{
-    /// <summary>A definition with no shop to fill — the preview, and every site without a catalog.</summary>
-    public static RenderedSiteView Of(SiteDefinition definition) => new(definition, []);
-}
+    IReadOnlyList<Product> Products,
+    string HomePath = "/");

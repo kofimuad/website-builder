@@ -195,8 +195,11 @@ else
                         <input class="edit button" @bind="hero.CallToActionLabel" @bind:event="oninput" @bind:after="MarkDirty" placeholder="Button text" />
                         @if (_images is not null)
                         {
+                            @* The @@ matters: Url is a string parameter, so without it Razor passes
+                               the literal text "hero.ImageUrl" and the slot shows a broken image
+                               that no upload can ever replace. *@
                             <ImageField Store="_images" TenantId="_site.TenantId" AddLabel="Add a main photo"
-                                        Url="hero.ImageUrl"
+                                        Url="@hero.ImageUrl"
                                         UrlChanged="url => { hero.ImageUrl = url; MarkDirty(); }" />
                         }
                         break;
@@ -207,7 +210,7 @@ else
                         @if (_images is not null)
                         {
                             <ImageField Store="_images" TenantId="_site.TenantId" AddLabel="Add a photo"
-                                        Url="about.ImageUrl"
+                                        Url="@about.ImageUrl"
                                         UrlChanged="url => { about.ImageUrl = url; MarkDirty(); }" />
                         }
                         break;

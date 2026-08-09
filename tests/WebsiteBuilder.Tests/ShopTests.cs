@@ -201,6 +201,18 @@ public class ShopTests(PostgresFixture fixture) : IDisposable
     }
 
     [Fact]
+    public async Task Nav_links_on_a_shop_page_point_back_at_the_home_page()
+    {
+        // The anchors live on the home page, so from /cart they have to be "/#…". Bare "#…" would
+        // scroll the cart page to nothing.
+        var subdomain = await SeedShopAsync(products: Jollof());
+
+        var html = await CreateClient().GetStringAsync($"http://{subdomain}.platform.com/cart");
+
+        Assert.Contains("href=\"/#contact\"", html);
+    }
+
+    [Fact]
     public async Task The_home_page_shows_the_shop_section_with_its_products()
     {
         var subdomain = await SeedShopAsync(products: Jollof());

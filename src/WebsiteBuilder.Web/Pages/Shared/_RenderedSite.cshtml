@@ -4,7 +4,7 @@
 @{
     var site = Model.Definition;
     var products = Model.Products;
-    var chrome = new SiteChrome(site);
+    var chrome = new SiteChrome(site, Model.HomePath);
     var visible = chrome.Visible;
     var anchors = chrome.Anchors;
     var contactDetails = chrome.Contact;

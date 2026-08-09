@@ -3,4 +3,6 @@
 @{
     Layout = null;
 }
-@await Html.PartialAsync("_RenderedSite", new WebsiteBuilder.Web.Pages.RenderedSiteView(Model.Draft!, Model.Products))
+@* Home is this page: nav anchors must stay inside the preview rather than jumping to the live site. *@
+@await Html.PartialAsync("_RenderedSite",
+    new WebsiteBuilder.Web.Pages.RenderedSiteView(Model.Draft!, Model.Products, $"/preview/{Model.SiteId}"))

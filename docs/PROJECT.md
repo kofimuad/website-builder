@@ -45,7 +45,7 @@ the startup banner and any `AI GENERATION FAILED` line in the log are. It was a
 static picture of a plumbing site until 2026-08-08, which meant it showed a mechanic invented
 guarantees and a headline about blocked drains.
 
-**Tests:** 432 total, all passing, and the suite makes no model API calls at all — see §11.
+**Tests:** 437 total, all passing, and the suite makes no model API calls at all — see §11.
 
 ---
 
@@ -369,7 +369,10 @@ a product is **live the moment it is saved** — there is no draft copy of a pri
 page in the builder says so. The definition carries only a `shop` section marking where the catalog
 appears, which keeps the document a document.
 
-The slug is unique **per tenant**, not globally: two businesses may both sell jollof.
+The slug is unique **per tenant**, not globally: two businesses may both sell jollof. **It follows
+the name.** Everything is added as "New item", so a slug that stayed put left the whole catalog
+sitting at `/products/new-item-2`; the site's own links are always built from the current slug, so
+the only cost is that a link shared before a rename stops working.
 
 ### What a tenant host serves
 

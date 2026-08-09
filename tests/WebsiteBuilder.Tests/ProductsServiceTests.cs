@@ -98,9 +98,8 @@ public class ProductsServiceTests(PostgresFixture fixture) : IDisposable
     }
 
     [Fact]
-    public async Task Saving_keeps_a_slug_that_is_already_correct()
+    public async Task An_edit_that_is_not_a_rename_leaves_the_address_alone()
     {
-        // Renaming should not churn the address of a product whose link is already out there.
         var (scope, products, _) = await ScopeForNewTenantAsync();
         using var _s = scope;
 
@@ -109,6 +108,54 @@ public class ProductsServiceTests(PostgresFixture fixture) : IDisposable
         await products.SaveAsync(product);
 
         Assert.Equal("jollof", product.Slug);
+    }
+
+    [Fact]
+    public async Task Renaming_a_product_moves_its_address()
+    {
+        // Everything is added as "New item", so an address that did not follow the name left the
+        // whole catalog sitting at /products/new-item-2.
+        var (scope, products, _) = await ScopeForNewTenantAsync();
+        using var _s = scope;
+
+        var product = await products.AddAsync("New item");
+        Assert.Equal("new-item", product.Slug);
+
+        product.Name = "Balloon arch";
+        await products.SaveAsync(product);
+
+        Assert.Equal("balloon-arch", product.Slug);
+    }
+
+    [Fact]
+    public async Task A_rename_cannot_collide_with_another_products_address()
+    {
+        var (scope, products, _) = await ScopeForNewTenantAsync();
+        using var _s = scope;
+
+        await products.AddAsync("Balloon arch");
+        var second = await products.AddAsync("Something else");
+
+        second.Name = "Balloon arch";
+        await products.SaveAsync(second);
+
+        Assert.Equal("balloon-arch-2", second.Slug);
+    }
+
+    [Fact]
+    public async Task A_name_cleared_to_nothing_still_leaves_a_usable_product()
+    {
+        // The page saves on blur, so an empty name does reach here. It must not produce a product
+        // with no name and no address.
+        var (scope, products, _) = await ScopeForNewTenantAsync();
+        using var _s = scope;
+
+        var product = await products.AddAsync("Jollof");
+        product.Name = "   ";
+        await products.SaveAsync(product);
+
+        Assert.False(string.IsNullOrWhiteSpace(product.Name));
+        Assert.False(string.IsNullOrWhiteSpace(product.Slug));
     }
 
     [Fact]
