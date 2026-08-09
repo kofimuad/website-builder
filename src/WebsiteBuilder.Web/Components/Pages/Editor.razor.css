@@ -17,8 +17,19 @@ svg { width: 1em; height: 1em; flex-shrink: 0; }
     padding: 13px 20px;
     background: #16161A;
 }
-.status { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: #A5A5B0; }
-.status-icon { font-size: 15px; color: #7FD6AD; }
+.bar-left { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.back {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 12px 8px 9px; border-radius: 8px;
+    border: 1px solid #3A3A42; background: transparent;
+    color: #F2F2F5; font-family: var(--font-body); font-size: 14px; font-weight: 500;
+    text-decoration: none; white-space: nowrap;
+}
+.back:hover { border-color: #55555F; }
+.back-icon { font-size: 16px; flex-shrink: 0; }
+
+.status { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: #A5A5B0; white-space: nowrap; }
+.status-icon { font-size: 15px; color: #7FD6AD; flex-shrink: 0; }
 .status.busy { color: #E7B24A; }
 .status.busy .status-icon { display: none; }
 

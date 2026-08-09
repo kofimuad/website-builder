@@ -24,22 +24,25 @@
 
 /* The real input is hidden behind the label so the control can be styled, but it stays in the
    accessibility tree and keeps its own keyboard behaviour. */
+/* Theme tokens, not fixed hexes. These controls were styled when the editor body was dark, and
+   #F2F2F5 text survived the move to the light editor as white-on-white — the button was still
+   there, still clickable, and completely unreadable. Tokens follow the page instead. */
 .img-pick {
     display: inline-flex;
     align-items: center;
     gap: 6px;
     padding: 8px 13px;
     border-radius: 8px;
-    border: 1px dashed #55555F;
+    border: 1px dashed var(--fg-muted);
     background: transparent;
-    color: #F2F2F5;
+    color: var(--fg);
     font-family: var(--font-body);
     font-size: 13px;
-    font-weight: 500;
+    font-weight: 600;
     cursor: pointer;
 }
 
-.img-pick:hover { border-color: var(--accent); }
+.img-pick:hover { border-color: var(--accent); color: var(--accent-strong); }
 .img-pick.busy { opacity: .65; cursor: default; }
 
 .img-pick ::deep input[type="file"] {
@@ -58,18 +61,19 @@
 .img-drop {
     padding: 8px 12px;
     border-radius: 8px;
-    border: 1px solid #3A3A42;
+    border: 1px solid var(--line);
     background: transparent;
-    color: var(--fg-muted);
+    color: var(--fg2);
     font-family: var(--font-body);
     font-size: 13px;
     cursor: pointer;
 }
 
-.img-drop:hover { color: #F2F2F5; border-color: #55555F; }
+.img-drop:hover { color: var(--fg); border-color: var(--fg-muted); }
 
 .img-error {
     margin: 0;
     font-size: 13px;
-    color: #FFB4AB;
+    /* Readable against a light card; #FFB4AB is a dark-theme error colour and washed out here. */
+    color: #B3261E;
 }

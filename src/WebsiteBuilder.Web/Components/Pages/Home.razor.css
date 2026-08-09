@@ -20,7 +20,11 @@
     overflow-x: hidden;
 }
 
-.home .icon {
+/* ::deep is load-bearing, not decoration: Icon() hands these svgs over as a MarkupString, which
+   never receives Blazor's scope attribute, so a plain ".home .icon" compiles to ".icon[b-…]" and
+   matches nothing. An svg with a viewBox and no size then renders at the CSS default 300×150.
+   Every .icon rule below needs it for the same reason. */
+.home ::deep .icon {
     width: 1em;
     height: 1em;
     flex-shrink: 0;
@@ -49,7 +53,7 @@
     border-radius: 9999px;
 }
 .btn-outline:hover { border-color: var(--fg-muted); }
-.btn-outline .icon { font-size: 16px; }
+.btn-outline ::deep .icon { font-size: 16px; }
 .nav-right .btn-primary { padding: 10px 18px; font-size: 15px; }
 .btn-lg { padding: 14px 26px; font-size: 16px; }
 .btn-outline.btn-lg { padding: 14px 22px; }
@@ -107,7 +111,7 @@
     background: var(--accent);
     color: #fff;
 }
-.brand-mark .icon { font-size: 18px; }
+.brand-mark ::deep .icon { font-size: 18px; }
 .brand-name { font-family: var(--font-head); font-size: 20px; font-weight: 600; }
 .nav-right { display: flex; align-items: center; gap: 28px; }
 .nav-links { display: flex; align-items: center; gap: 24px; }
@@ -134,7 +138,7 @@
 .hero-cta { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .hero-trust { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--fg-muted); }
 .trust-check { display: inline-flex; color: var(--accent); }
-.trust-check .icon { font-size: 16px; }
+.trust-check ::deep .icon { font-size: 16px; }
 
 .hero-tile {
     flex: 1 1 0;
@@ -241,7 +245,7 @@
     color: var(--accent);
     box-shadow: 0 1px 2px rgba(0,0,0,.04);
 }
-.feature-ib .icon { font-size: 18px; }
+.feature-ib ::deep .icon { font-size: 18px; }
 .feature-h { font-family: var(--font-head); font-size: 19px; font-weight: 600; }
 .feature-d { margin: 0; font-size: 14px; line-height: 1.5; color: var(--fg2); }
 .feature-demo {
@@ -338,7 +342,7 @@
     background: rgba(10,125,85,.2);
     color: #8FE3B8;
 }
-.cred-ib .icon { font-size: 20px; }
+.cred-ib ::deep .icon { font-size: 20px; }
 .cred-h { margin: 0; font-family: var(--font-head); font-size: 20px; font-weight: 600; color: #fff; }
 .cred-d { margin: 0; font-size: 15px; line-height: 1.53; color: #B6C7B9; }
 
@@ -372,7 +376,7 @@
     background: var(--accent);
     color: #fff;
 }
-.footer-mark .icon { font-size: 15px; }
+.footer-mark ::deep .icon { font-size: 15px; }
 .footer-name { font-family: var(--font-head); font-size: 16px; font-weight: 600; }
 .footer-links { display: flex; align-items: center; gap: 24px; }
 .footer-links a { font-size: 14px; color: var(--fg2); }

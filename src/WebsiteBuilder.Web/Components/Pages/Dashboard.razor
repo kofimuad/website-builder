@@ -467,6 +467,12 @@
         ["bell"] = "<path d='M10.268 21a2 2 0 0 0 3.464 0'/><path d='M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326'/>",
     };
 
+    // width/height are on the element itself, not left to CSS. An svg with a viewBox and no size
+    // renders at the CSS default 300×150 and inflates whatever contains it, and the stylesheet
+    // cannot be relied on to prevent that: this markup arrives as a MarkupString, so Blazor never
+    // stamps it with the scope attribute that scoped-CSS selectors are compiled against. The rules
+    // in Dashboard.razor.css use ::deep to reach it and tune the size per context; this is the
+    // floor that holds when something goes wrong with that.
     private static MarkupString Icon(string name) => new(
-        $"<svg class='icon' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>{Icons[name]}</svg>");
+        $"<svg class='icon' width='1em' height='1em' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>{Icons[name]}</svg>");
 }

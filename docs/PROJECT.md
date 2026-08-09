@@ -543,6 +543,32 @@ domain is *unreachable*, not merely insecure.
 | `Gemini__ApiKey` or `GEMINI_API_KEY` | Optional. Used only when no Anthropic key is set |
 | `Gemini__Model` | Defaults to `gemini-3.6-flash`. Set this when Google retires an id |
 
+### Looking at the running app (`.mcp.json`)
+
+`.mcp.json` configures **chrome-devtools-mcp**, which drives a real Chrome and can navigate,
+screenshot, read the console, and inspect computed styles.
+
+It exists because the test suite covers behaviour and nothing covers appearance. Several bugs have
+now shipped that no test could have caught and that only a screenshot revealed — an SVG with no
+intrinsic size inflating a button, near-white button text left behind on a light background after
+the editor's theme changed. Both were invisible in the source and obvious on screen.
+
+Flags, and why each one is there:
+
+| Flag | Reason |
+| --- | --- |
+| `--viewport 1440x900` | A fixed desktop viewport, so two screenshots are comparable |
+| `--screenshotFormat webp`, `--screenshotMaxWidth 1440` | WebP is 3–5× smaller than PNG. Screenshots are read into the conversation, so this is context budget |
+| `--acceptInsecureCerts` | The dev server is HTTPS with the ASP.NET dev cert, which a fresh Chrome profile may not trust |
+| `--no-usage-statistics` | Opts out of Google's collection. **The flag, not the `CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS` env var** — the env var is documented but was measured not to suppress it |
+
+No `--isolated`: the browser keeps a persistent dedicated profile, so a magic-link sign-in survives
+between runs rather than being repeated for every look at the dashboard.
+
+Pencil MCP is configured separately, at user level, and `ui.pen` is at the repo root — that is the
+design source for the builder's own UI, and it is stale — it still carries the pre-rename branding.
+Never open it with normal file tools; it is encrypted and only the Pencil MCP tools can read it.
+
 ### Testing
 
 xUnit. Integration tests run against **real Postgres** via Testcontainers, so Docker must be running.

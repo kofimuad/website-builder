@@ -1,5 +1,11 @@
 .dash { display: flex; min-height: 100vh; background: var(--ground); }
-.dash .icon { width: 1em; height: 1em; flex-shrink: 0; }
+/* ::deep, not a plain descendant selector, because the icons are built at runtime by Icon() and
+   handed over as a MarkupString. Blazor stamps its scope attribute onto elements written in the
+   .razor file at compile time, so ".dash .icon" compiles to ".icon[b-…]" and never matches an svg
+   that appeared later. ::deep moves the attribute onto the ancestor instead. Without this the svg
+   has a viewBox and no size, falls back to the CSS default 300×150 for a replaced element, and
+   inflates whatever contains it — which is what happened to the "Build my website" button. */
+.dash ::deep .icon { width: 1em; height: 1em; flex-shrink: 0; }
 .dash a { text-decoration: none; }
 
 /* ---------- sidebar ---------- */
@@ -65,8 +71,12 @@
     display: inline-flex; align-items: center; gap: 8px;
     padding: 11px 18px; border-radius: 9999px;
     font-family: var(--font-body); font-size: 14px; font-weight: 600; cursor: pointer;
+    /* A label is one line. Without this the button is free to fold "Build my website" into three
+       whenever the header row is tight, which is how the oversized icon showed up as a giant
+       lozenge rather than as an obviously wrong icon. Home's .btn already says the same. */
+    white-space: nowrap;
 }
-.btn .icon { font-size: 15px; }
+.btn ::deep .icon { font-size: 15px; }
 .btn.ghost { background: transparent; border: 1px solid var(--line); color: var(--fg); }
 .btn.ghost:hover { border-color: var(--fg-muted); }
 .btn.solid { background: var(--accent); color: #fff; padding: 11px 20px; }
@@ -88,11 +98,11 @@
 .status-pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 9999px; background: #E4F3EA; color: var(--accent-strong); font-size: 12px; font-weight: 600; }
 .status-pill i { width: 7px; height: 7px; border-radius: 9999px; background: var(--accent); }
 .status-url { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--fg2); }
-.status-url .icon { font-size: 13px; color: var(--fg-muted); }
+.status-url ::deep .icon { font-size: 13px; color: var(--fg-muted); }
 .status-updated { color: var(--fg-muted); }
 .domain-btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 9999px; background: var(--tile2); border: 1px solid #D6DECB; color: var(--accent-strong); font-size: 14px; font-weight: 600; }
 .domain-btn:hover { border-color: var(--accent); }
-.domain-btn .icon { font-size: 14px; }
+.domain-btn ::deep .icon { font-size: 14px; }
 
 /* ---------- stat cards ---------- */
 .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
@@ -133,7 +143,7 @@
 .lead-msg { font-size: 13px; color: var(--fg2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lead-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; flex-shrink: 0; }
 .lead-via { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 9999px; background: var(--tile2); color: var(--accent-strong); font-size: 11.5px; font-weight: 600; }
-.lead-via .icon { font-size: 12px; }
+.lead-via ::deep .icon { font-size: 12px; }
 .lead-time { font-size: 12px; color: var(--fg-muted); }
 
 .side-col { width: 340px; flex-shrink: 0; display: flex; flex-direction: column; gap: 20px; }
@@ -167,7 +177,7 @@
 .tip-body { font-size: 13.5px; line-height: 1.5; color: #A9BFB0; }
 .tip-btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 10px 16px; border-radius: 9999px; background: #22392A; color: #fff; font-size: 13.5px; font-weight: 600; }
 .tip-btn:hover { background: #2A4633; }
-.tip-btn .icon { font-size: 14px; }
+.tip-btn ::deep .icon { font-size: 14px; }
 
 /* ---------- states the real data introduces ---------- */
 .loading { color: var(--fg-muted); font-size: 15px; }
