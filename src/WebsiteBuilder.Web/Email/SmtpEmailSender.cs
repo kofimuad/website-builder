@@ -36,9 +36,15 @@ public sealed class SmtpEmailSender(IOptions<EmailOptions> options, ILogger<Smtp
         mail.AlternateViews.Add(AlternateView.CreateAlternateViewFromString(
             message.HtmlBody, null, "text/html"));
 
+        // SmtpClient.Timeout does not apply to the async send, and a host that drops SMTP packets
+        // rather than refusing them (Railway, below Pro) leaves the connect attempt hanging for
+        // minutes. Bound it here so the failure reaches the person waiting while they still care.
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(_options.SendTimeout);
+
         try
         {
-            await client.SendMailAsync(mail, cancellationToken);
+            await client.SendMailAsync(mail, deadline.Token);
         }
         catch (Exception ex)
         {

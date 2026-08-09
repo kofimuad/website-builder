@@ -39,10 +39,11 @@ subdomains, the CS Build rename.
 2. **Cloudinary account doesn't exist**, so photo uploads are hidden in onboarding and the editor.
    The code is complete on both — `Images__CloudName`, `Images__ApiKey` and `Images__ApiSecret`
    (all three or none) are the only thing missing. **No upload has ever run against the real API.**
-3. **Resend is DNS-verified but unproven end to end**, and as of 2026-08-08 mail is not arriving in
-   production. Whether the Railway `Email__*` variables are set has still never been confirmed —
-   which is itself the most likely cause, because `LogEmailSender` reports success. See
-   `docs/PROJECT.md` §10, "When mail does not arrive".
+3. **Mail was not arriving in production, and the cause is now known.** The Railway `Email__*`
+   variables were set correctly and SMTP still failed with
+   `SocketException (110): Connection timed out` on `smtp.resend.com:587`. **Railway disables
+   outbound SMTP below the Pro plan** and drops the packets rather than refusing them. The app now
+   sends over Resend's HTTPS API when `Email__ApiKey` is set. Untried against the real API.
 
 **Tests: 364 total, all passing, ~17s, and free.** `TenantAppFactory` blanks the model API key for
 the test host. The old lone failure —
@@ -74,6 +75,14 @@ reported twice. It passes now because the host never takes the model path.
 - **`ui.pen` is encrypted.** It cannot be read or edited with normal file tools, only through the
   Pencil MCP with the file open in the editor — which only Kofi can do. It still says "Sitely" in
   nine places.
+- **Railway blocks outbound SMTP below the Pro plan**, by dropping packets. Anything that needs an
+  outbound port other than 443 will look like a hang, not an error. Reach for an HTTPS API first.
+- **Railway variable names use `__`, not `:`.** A variable called `Gemini` does nothing; the app
+  reads `Gemini__ApiKey`. This cost a deploy — the startup banner said "template only" while the
+  key sat there looking correct.
+- **Data protection keys are not persisted** (`/root/.aspnet/DataProtection-Keys` inside the
+  container). Every deploy signs everyone out and invalidates in-flight antiforgery tokens. Not yet
+  fixed; the fix is `PersistKeysToDbContext` plus a migration.
 - **Local Postgres is on port 55440**, not 5432. `docker compose up -d`.
 - **Run the app with** `ASPNETCORE_ENVIRONMENT=Development ASPNETCORE_URLS=http://localhost:5184
   dotnet run --project src/WebsiteBuilder.Web --no-launch-profile`. Omitting the environment variable

@@ -48,7 +48,7 @@ stored per-machine outside the repo and loaded automatically in Development:
 dotnet user-secrets set "Gemini:ApiKey" "…"                   --project src/WebsiteBuilder.Web
 dotnet user-secrets set "Auth:GoogleClientId" "…"             --project src/WebsiteBuilder.Web
 dotnet user-secrets set "Auth:GoogleClientSecret" "…"         --project src/WebsiteBuilder.Web
-dotnet user-secrets set "Email:SmtpHost" "smtp.resend.com"    --project src/WebsiteBuilder.Web
+dotnet user-secrets set "Email:ApiKey" "re_…"                 --project src/WebsiteBuilder.Web
 dotnet user-secrets set "Images:CloudName" "…"                --project src/WebsiteBuilder.Web
 dotnet user-secrets set "Images:ApiKey" "…"                   --project src/WebsiteBuilder.Web
 dotnet user-secrets set "Images:ApiSecret" "…"                --project src/WebsiteBuilder.Web
@@ -118,10 +118,11 @@ Deployed on Railway from `main`. The service needs:
 | `DATABASE_URL`                       | Reference the Postgres service, e.g. `${{Postgres.DATABASE_URL}}` |
 | `TenantResolution__PlatformDomain`   | The domain tenant subdomains hang off — `csbuild.app`. Defaults to `localhost`, and left at the default every real host 404s |
 | `Platform__PublicBaseUrl`            | Absolute URL of the builder, `https://csbuild.app`. Links in email are built from it |
-| `Email__SmtpHost`                    | Leave unset and email is logged, not sent — sign-in becomes unusable in production |
+| `Email__ApiKey`                      | Resend API key (`re_…`), sending over HTTPS. **Use this on Railway** — outbound SMTP is blocked below the Pro plan |
+| `Email__SmtpHost`                    | SMTP alternative, used only when `Email__ApiKey` is unset      |
 | `Email__SmtpPort`                    | Defaults to 587                                               |
 | `Email__SmtpUser` / `Email__SmtpPassword` | Provider credentials. On Resend the user is literally `resend` and the password is the API key |
-| `Email__FromAddress`                 | **Required** once `SmtpHost` is set — startup fails without it. Must be on a domain the provider has verified |
+| `Email__FromAddress`                 | **Required** once either is set — startup fails without it. Must be on a domain the provider has verified |
 | `Email__FromName`                    | Optional display name. Blank sends the address alone           |
 | `Images__CloudName`                  | Cloudinary account. All three image variables must be set together, or none |
 | `Images__ApiKey`                     | Optional as a group. Without them the editor offers no photo uploads |
@@ -134,8 +135,12 @@ Deployed on Railway from `main`. The service needs:
 A blank `DATABASE_URL` is treated as missing: an unresolved Railway variable reference arrives as
 an empty string rather than being absent.
 
-**`Email__SmtpHost` is effectively required in production.** Sign-in is by emailed link, so with no
-mail provider nobody can get in.
+**A mail provider is effectively required in production.** Sign-in is by emailed link, so with none
+configured nobody can get in — and startup logs that at Error rather than leaving you to guess.
+
+**On Railway, use `Email__ApiKey`, not the SMTP variables.** Railway disables outbound SMTP below
+the Pro plan by dropping the packets, so a send to port 587 does not fail — it hangs for minutes and
+then reports `Connection timed out`.
 
 ## Domain and DNS
 

@@ -343,23 +343,37 @@ names at the price of rewriting URLs already saved in a site.
 
 ## 10. Email
 
-SMTP, not a vendor SDK, so changing provider is configuration rather than a code change. Resend is
-the provider; Gmail was rejected (≈500/day cap, app passwords, no DKIM alignment for our own domain).
+**Resend over HTTPS, not SMTP.** Gmail was rejected as a provider (≈500/day cap, app passwords, no
+DKIM alignment for our own domain).
+
+This reverses the original decision, which was SMTP precisely so that changing provider stayed a
+configuration change. The reasoning was sound; the hosting environment overruled it.
+**Railway disables outbound SMTP on every plan below Pro**, and does it by dropping the packets
+rather than refusing the connection — so `smtp.resend.com:587` produced
+`SocketException (110): Connection timed out` four and a half minutes after each attempt, with the
+owner looking at a confirmation screen and an empty inbox. Port 443 is never blocked. Changing the
+plan would also have fixed it; paying monthly to keep an abstraction was the worse trade.
+
+`SmtpEmailSender` is still here and still selected by `Email:SmtpHost`, so a host that permits SMTP
+— or a provider with no HTTP API — remains a configuration change. `Email:ApiKey` wins when both
+are set, because that is the state a Railway project is in while moving across.
 
 Two fail-fast guards, both because the alternative symptom is *silence*:
 
-- `Email:SmtpHost` set with an empty `Email:FromAddress` throws at startup.
+- A provider configured with an empty `Email:FromAddress` throws at startup.
 - With no SMTP host at all, `LogEmailSender` writes the message to the log instead. This is correct
   locally and catastrophic in production, so **startup now logs which mode is active.**
 
-`System.Net.Mail` can only do STARTTLS. **Port 465 will hang, not fail** — use 587.
+On the SMTP path only: `System.Net.Mail` can only do STARTTLS, so **port 465 will hang, not fail**.
+Sends are bounded by `Email:SendTimeout` (20s) — `SmtpClient.Timeout` does not apply to the async
+send, and a dropped connection otherwise hangs for minutes.
 
 ### When mail does not arrive
 
 Three failures look identical to the person waiting for the email, and the UI cannot tell them
 apart on purpose. In order of likelihood:
 
-1. **No SMTP host configured.** `LogEmailSender` "sends" successfully to the log, so the UI shows
+1. **No provider configured.** `LogEmailSender` "sends" successfully to the log, so the UI shows
    the confirmation screen. Outside Development startup now logs this at **Error**.
 2. **Rate limited.** Five links per address per 15 minutes; the sixth silently shows the same
    confirmation, because saying "too many attempts" would confirm the address has an account. Easy
@@ -393,8 +407,9 @@ domain is *unreachable*, not merely insecure.
 | `DATABASE_URL` | Blank is treated as missing — an unresolved Railway reference arrives as `""` |
 | `TenantResolution__PlatformDomain` | `csbuild.app`. Left at the `localhost` default, every real host 404s |
 | `Platform__PublicBaseUrl` | `https://csbuild.app`. Links in email are built from it |
-| `Email__SmtpHost` / `SmtpPort` / `SmtpUser` / `SmtpPassword` | On Resend the user is literally `resend`; the password is the API key |
-| `Email__FromAddress` | **Required** once `SmtpHost` is set |
+| `Email__ApiKey` | Resend API key (`re_…`). **The path that works on Railway** — SMTP is blocked below Pro |
+| `Email__SmtpHost` / `SmtpPort` / `SmtpUser` / `SmtpPassword` | Only used when `Email__ApiKey` is unset. On Resend the user is literally `resend` |
+| `Email__FromAddress` | **Required** once either is set |
 | `Images__CloudName` / `ApiKey` / `ApiSecret` | All three or none |
 | `Auth__GoogleClientId` / `GoogleClientSecret` | Optional pair |
 | `Gemini__ApiKey` or `GEMINI_API_KEY` | Optional. Without it, the template generator runs |

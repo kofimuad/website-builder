@@ -1,3 +1,4 @@
+using System.Net.Http.Headers;
 using System.Text.Encodings.Web;
 using System.Text.Unicode;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -65,8 +66,9 @@ builder.Services.AddScoped<PlatformUrls>();
 builder.Services.AddScoped<OwnerSignInService>();
 builder.Services.AddScoped<OnboardingDraftStore>();
 
-// No SMTP host configured means a developer can still sign in: the link goes to the log.
+// No provider configured means a developer can still sign in: the link goes to the log.
 var emailOptions = builder.Configuration.GetSection(EmailOptions.SectionName).Get<EmailOptions>() ?? new EmailOptions();
+
 if (emailOptions.IsConfigured)
 {
     // A provider with no From address sends nothing anybody receives, and the symptom is silence:
@@ -74,11 +76,25 @@ if (emailOptions.IsConfigured)
     if (string.IsNullOrWhiteSpace(emailOptions.FromAddress))
     {
         throw new InvalidOperationException(
-            "Email:SmtpHost is set but Email:FromAddress is empty. Set it to an address on a domain " +
-            "the provider has verified for us, e.g. no-reply@ourdomain.com — mail from an " +
-            "unverified domain bounces.");
+            "An email provider is configured but Email:FromAddress is empty. Set it to an address " +
+            "on a domain the provider has verified for us, e.g. no-reply@ourdomain.com — mail from " +
+            "an unverified domain bounces.");
     }
+}
 
+if (emailOptions.UsesApi)
+{
+    // HTTPS, because outbound SMTP is blocked on Railway below the Pro plan. See ResendEmailSender.
+    builder.Services.AddHttpClient<IEmailSender, ResendEmailSender>(client =>
+    {
+        client.BaseAddress = new Uri("https://api.resend.com/");
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", emailOptions.ApiKey);
+        client.Timeout = emailOptions.SendTimeout;
+    });
+}
+else if (emailOptions.UsesSmtp)
+{
     // SmtpEmailSender uses System.Net.Mail, which can only start TLS on a plaintext connection.
     // It cannot speak implicit TLS, which is the whole point of 465 — so a send there does not
     // fail cleanly, it hangs until the timeout and looks like the provider ignoring us.
@@ -86,7 +102,8 @@ if (emailOptions.IsConfigured)
     {
         throw new InvalidOperationException(
             "Email:SmtpPort is 465, which this app cannot use: it sends with System.Net.Mail, and " +
-            "that only supports STARTTLS, not implicit TLS. Use 587 (Resend also accepts 2587).");
+            "that only supports STARTTLS, not implicit TLS. Use 587, or set Email:ApiKey to send " +
+            "over HTTPS instead.");
     }
 
     builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
@@ -225,9 +242,7 @@ app.Logger.LogInformation(
     "Tenant subdomains hang off {PlatformDomain}. Sign-in email: {Mail}. Site generation: {Generator}. " +
     "Per-section assistant: {Assistant}. Photo uploads: {Images}.",
     tenantOptions.PlatformDomain,
-    emailOptions.IsConfigured
-        ? $"sending via {emailOptions.SmtpHost} as {emailOptions.FromAddress}"
-        : "WRITTEN TO THIS LOG, NOT SENT — no Email:SmtpHost configured",
+    emailOptions.Describe(),
     string.IsNullOrWhiteSpace(geminiKey)
         ? "template only — no Gemini:ApiKey / GEMINI_API_KEY configured"
         : $"Gemini ({builder.Configuration[$"{GeminiOptions.SectionName}:Model"] ?? new GeminiOptions().Model}), template fallback",
@@ -252,8 +267,8 @@ if (!app.Environment.IsDevelopment() && !emailOptions.IsConfigured)
 {
     app.Logger.LogError(
         "NO EMAIL PROVIDER CONFIGURED. Sign-in links and lead notifications are being written to " +
-        "this log instead of being sent. Set Email__SmtpHost, Email__SmtpPort (587), " +
-        "Email__SmtpUser, Email__SmtpPassword and Email__FromAddress.");
+        "this log instead of being sent. Set Email__ApiKey to a Resend API key and " +
+        "Email__FromAddress to an address on a domain Resend has verified.");
 }
 
 // Railway has no separate release phase, so pending migrations are applied on boot.
