@@ -30,8 +30,10 @@
             --font-heading: @Html.Raw(headingStack);
             --font-body: @Html.Raw(bodyStack);
             --edge: color-mix(in srgb, var(--muted) 18%, transparent);
-            --shadow: 0 1px 2px rgb(0 0 0 / .04), 0 8px 24px -12px rgb(0 0 0 / .18);
-            --radius: 1rem;
+            --shadow: 0 1px 2px rgb(0 0 0 / .04), 0 16px 40px -16px rgb(0 0 0 / .24);
+            --radius: 1.2rem;
+            --radius-lg: 1.6rem;
+            --glow: color-mix(in srgb, var(--primary) 18%, transparent);
         }
         * { box-sizing: border-box; }
         html { scroll-behavior: smooth; scroll-padding-top: 5rem; }
@@ -39,7 +41,9 @@
             margin: 0;
             font-family: var(--font-body);
             color: var(--text);
-            background: var(--background);
+            background:
+                radial-gradient(circle at top left, var(--glow) 0, transparent 34%),
+                linear-gradient(180deg, color-mix(in srgb, var(--surface) 92%, white 8%) 0%, var(--background) 100%);
             line-height: 1.65;
             -webkit-text-size-adjust: 100%;
         }
@@ -51,9 +55,14 @@
         p { margin: 0 0 1rem; }
         img { max-width: 100%; height: auto; display: block; }
         a { color: var(--primary); }
-        section { padding: 3.5rem 1.25rem; }
-        section:nth-of-type(even) { background: var(--surface); }
-        .wrap { max-width: 64rem; margin: 0 auto; }
+        section {
+            padding: 3.5rem 1.25rem;
+            position: relative;
+        }
+        section:nth-of-type(even) {
+            background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 86%, white 14%) 0%, transparent 100%);
+        }
+        .wrap { max-width: 68rem; margin: 0 auto; }
 
         /* ---------- top bar ---------- */
         .topbar {
@@ -74,22 +83,36 @@
         .topbar .button { margin: 0; padding: .55rem 1.1rem; font-size: .9rem; }
 
         /* ---------- hero ---------- */
-        .hero { position: relative; padding: 0; background: var(--surface); }
+        .hero {
+            position: relative; padding: 0; background: linear-gradient(140deg, var(--surface) 0%, color-mix(in srgb, var(--surface) 70%, var(--primary) 30%) 100%);
+            overflow: hidden;
+        }
         .hero-photo { position: relative; }
-        .hero-photo img { width: 100%; height: clamp(15rem, 42vh, 26rem); object-fit: cover; }
+        .hero-photo img {
+            width: 100%; height: clamp(15rem, 42vh, 26rem); object-fit: cover;
+            transform: scale(1.02);
+            animation: floatImage 12s ease-in-out infinite alternate;
+        }
         /* A scrim rather than a flat tint: the headline has to stay legible over a photo we have
            never seen, taken on a phone we do not control. */
         .hero-photo::after {
             content: ""; position: absolute; inset: 0;
             background: linear-gradient(180deg, rgb(0 0 0 / .15) 0%, rgb(0 0 0 / .62) 100%);
         }
-        .hero-body { padding: 2.5rem 1.25rem 3rem; }
+        .hero-body {
+            padding: 2.5rem 1.25rem 3rem;
+            position: relative;
+            isolation: isolate;
+        }
         .hero-photo + .hero-body {
             position: absolute; inset: auto 0 0 0; padding: 1.5rem 1.25rem 1.75rem; color: #fff;
         }
         .hero-photo + .hero-body h1, .hero-photo + .hero-body .hero-sub { color: #fff; }
         .hero-photo + .hero-body .eyebrow { background: rgb(255 255 255 / .18); color: #fff; }
-        .hero h1 { font-size: clamp(2rem, 7.5vw, 3.4rem); margin-bottom: .35em; }
+        .hero h1 {
+            font-size: clamp(2rem, 7.5vw, 3.4rem); margin-bottom: .35em;
+            text-shadow: 0 8px 24px rgb(0 0 0 / .24);
+        }
         .hero-sub { color: var(--muted); font-size: 1.075rem; max-width: 34rem; }
         .eyebrow {
             display: inline-block; margin-bottom: .9rem;
@@ -103,11 +126,13 @@
         /* ---------- buttons ---------- */
         .button {
             display: inline-block; padding: .8rem 1.5rem; border-radius: 9999px;
-            background: var(--primary); color: #fff; text-decoration: none;
+            background: linear-gradient(135deg, var(--primary) 0%, color-mix(in srgb, var(--primary) 78%, var(--accent) 22%) 100%);
+            color: #fff; text-decoration: none;
             font-weight: 600; font-size: 1rem; line-height: 1.2;
             box-shadow: var(--shadow); transition: transform .15s ease, filter .15s ease;
+            border: 1px solid color-mix(in srgb, white 24%, transparent);
         }
-        .button:hover { transform: translateY(-1px); filter: brightness(1.06); }
+        .button:hover { transform: translateY(-2px); filter: brightness(1.08); }
         .button-ghost {
             background: transparent; color: inherit;
             border: 1.5px solid currentColor; box-shadow: none;
@@ -116,10 +141,14 @@
         /* ---------- cards ---------- */
         .grid { display: grid; gap: 1rem; grid-template-columns: 1fr; }
         .card {
-            background: var(--background); border: 1px solid var(--edge);
+            background: linear-gradient(180deg, var(--background) 0%, color-mix(in srgb, var(--background) 88%, var(--surface) 12%) 100%);
+            border: 1px solid var(--edge);
             border-radius: var(--radius); padding: 1.4rem;
             box-shadow: var(--shadow);
+            transform: translateY(0);
+            transition: transform .2s ease, box-shadow .2s ease;
         }
+        .card:hover { transform: translateY(-3px); box-shadow: 0 16px 40px -18px rgb(0 0 0 / .3); }
         .card h3 { margin-bottom: .35em; }
         .card p { margin: 0; color: var(--muted); }
         /* A short accent rule instead of an icon: nothing to invent, nothing to license. */
@@ -148,11 +177,12 @@
         .products { display: grid; gap: 1rem; grid-template-columns: repeat(2, 1fr); }
         .product {
             display: flex; flex-direction: column; text-decoration: none; color: inherit;
-            background: var(--background); border: 1px solid var(--edge);
+            background: linear-gradient(180deg, var(--background) 0%, color-mix(in srgb, var(--background) 90%, var(--surface) 10%) 100%);
+            border: 1px solid var(--edge);
             border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow);
-            transition: transform .15s ease;
+            transition: transform .2s ease, box-shadow .2s ease;
         }
-        .product:hover { transform: translateY(-2px); }
+        .product:hover { transform: translateY(-4px); box-shadow: 0 16px 36px -18px rgb(0 0 0 / .34); }
         .product img { width: 100%; aspect-ratio: 1 / 1; object-fit: cover; }
         .product-body { display: flex; flex-direction: column; gap: .2rem; padding: .9rem 1rem 1.1rem; }
         .product-name { font-weight: 600; line-height: 1.3; }
@@ -188,7 +218,7 @@
         }
         .whatsapp-order {
             display: inline-block; padding: .95rem 1.75rem; border-radius: 9999px;
-            background: #25D366; color: #0b3d20; font-weight: 700; text-decoration: none;
+            background: linear-gradient(135deg, #25D366 0%, #1fae58 100%); color: #0b3d20; font-weight: 700; text-decoration: none;
             box-shadow: var(--shadow);
         }
         .crumbs { margin-bottom: 1.5rem; font-size: .95rem; }
@@ -228,7 +258,10 @@
         iframe { width: 100%; border: 0; aspect-ratio: 16 / 9; margin-top: 1.5rem; border-radius: var(--radius); }
 
         /* ---------- closing prompt ---------- */
-        .closing { background: var(--primary); color: #fff; text-align: center; }
+        .closing {
+            background: linear-gradient(135deg, var(--primary) 0%, color-mix(in srgb, var(--primary) 70%, var(--accent) 30%) 100%);
+            color: #fff; text-align: center; overflow: hidden;
+        }
         .closing h2 { color: #fff; }
         .closing .button { background: #fff; color: var(--primary); }
 
@@ -259,9 +292,15 @@
         .callbar .call { background: var(--primary); color: #fff; }
         .callbar .whatsapp { background: #25D366; color: #0b3d20; }
 
+        @@keyframes floatImage {
+            0% { transform: scale(1.02) translateY(0); }
+            100% { transform: scale(1.06) translateY(-6px); }
+        }
+
         @@media (prefers-reduced-motion: reduce) {
             html { scroll-behavior: auto; }
-            .button { transition: none; }
+            .button, .card, .product { transition: none; }
+            .hero-photo img { animation: none; }
         }
 
         /* Mobile first: widen only once there is room. */

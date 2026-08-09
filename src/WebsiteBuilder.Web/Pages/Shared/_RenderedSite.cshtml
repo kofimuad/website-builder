@@ -1,3 +1,4 @@
+@using System.Text.Json
 @using WebsiteBuilder.Core.SiteModel
 @using WebsiteBuilder.Web.Pages
 @model RenderedSiteView
@@ -8,301 +9,370 @@
     var visible = chrome.Visible;
     var anchors = chrome.Anchors;
     var contactDetails = chrome.Contact;
+    var heroSection = visible.OfType<HeroSection>().FirstOrDefault();
+    var hoursMapSection = visible.OfType<HoursMapSection>().FirstOrDefault();
     var title = string.IsNullOrWhiteSpace(site.Meta.SeoTitle) ? site.Meta.BusinessName : site.Meta.SeoTitle;
     var description = site.Meta.SeoDescription ?? site.Meta.Tagline;
+    var canonicalPath = string.Concat(Context.Request.PathBase.Value ?? "", Context.Request.Path.Value ?? "");
+    var canonicalUrl = $"{Context.Request.Scheme}://{Context.Request.Host}{canonicalPath}";
+    var socialImage = heroSection?.ImageUrl;
+    var addressLines = hoursMapSection?.AddressLines ?? [];
+    var structuredData = new Dictionary<string, object?>
+    {
+        ["@context"] = "https://schema.org",
+        ["@type"] = "LocalBusiness",
+        ["name"] = site.Meta.BusinessName,
+        ["description"] = description,
+        ["url"] = canonicalUrl,
+        ["telephone"] = contactDetails?.PhoneNumber,
+        ["email"] = contactDetails?.Email,
+        ["address"] = addressLines.Count > 0 ? new Dictionary<string, object?>
+        {
+            ["@type"] = "PostalAddress",
+            ["streetAddress"] = addressLines.FirstOrDefault() ?? string.Empty,
+            ["addressLocality"] = addressLines.Count > 1 ? addressLines[1] : string.Empty,
+            ["addressRegion"] = addressLines.Count > 2 ? addressLines[2] : string.Empty,
+            ["addressCountry"] = "GH"
+        } : null,
+        ["openingHoursSpecification"] = hoursMapSection?.OpeningHours.Select(o => new Dictionary<string, object?>
+        {
+            ["@type"] = "OpeningHoursSpecification",
+            ["dayOfWeek"] = o.Day.ToString(),
+            ["opens"] = o.Opens?.ToString("HH:mm"),
+            ["closes"] = o.Closes?.ToString("HH:mm"),
+            ["public"] = o.Closed ? false : true
+        }).ToList()
+    };
+    var structuredDataJson = JsonSerializer.Serialize(structuredData, new JsonSerializerOptions
+    {
+        PropertyNamingPolicy =
+JsonNamingPolicy.CamelCase
+    });
 }
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>@title</title>
+    <link rel="canonical" href="@canonicalUrl" />
     @if (!string.IsNullOrWhiteSpace(description))
     {
         <meta name="description" content="@description" />
     }
-@await Html.PartialAsync("_SiteStyles", chrome)
-</head>
-<body class="@(chrome.HasCallBar ? "has-callbar" : "")">
-@await Html.PartialAsync("_SiteTopBar", chrome)
-@foreach (var section in visible)
-{
-    switch (section)
+    <meta property="og:title" content="@title" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="@canonicalUrl" />
+    <meta property="og:site_name" content="@site.Meta.BusinessName" />
+    @if (!string.IsNullOrWhiteSpace(description))
     {
-        case HeroSection heroSection:
-            <header class="hero" id="top">
-                @if (!string.IsNullOrWhiteSpace(heroSection.ImageUrl))
-                {
-                    <div class="hero-photo">
-                        @* The one image above the fold, so it is fetched early and never lazily —
+        <meta property="og:description" content="@description" />
+    }
+    @if (!string.IsNullOrWhiteSpace(socialImage))
+    {
+        <meta property="og:image" content="@socialImage" />
+    }
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="@title" />
+    @if (!string.IsNullOrWhiteSpace(description))
+    {
+        <meta name="twitter:description" content="@description" />
+    }
+    @if (!string.IsNullOrWhiteSpace(socialImage))
+    {
+        <meta name="twitter:image" content="@socialImage" />
+    }
+    <meta name="application/ld+json" content="@structuredDataJson" />
+    @await Html.PartialAsync("_SiteStyles", chrome)
+</head>
+
+<body class="@(chrome.HasCallBar ? "has-callbar" : "")">
+    @await Html.PartialAsync("_SiteTopBar", chrome)
+    @foreach (var section in visible)
+    {
+        switch (section)
+        {
+            case HeroSection heroSection:
+                <header class="hero" id="top">
+                    @if (!string.IsNullOrWhiteSpace(heroSection.ImageUrl))
+                    {
+                        <div class="hero-photo">
+                            @* The one image above the fold, so it is fetched early and never lazily —
                            it is almost always the largest contentful paint. *@
-                        <img src="@ImageDelivery.Cropped(heroSection.ImageUrl, 1600, 900)"
-                             alt="" width="1600" height="900" decoding="async" fetchpriority="high" />
-                    </div>
-                }
-                <div class="hero-body">
-                    <div class="wrap">
-                        @if (!string.IsNullOrWhiteSpace(site.Meta.Tagline))
-                        {
-                            <span class="eyebrow">@site.Meta.Tagline</span>
-                        }
-                        <h1>@heroSection.Headline</h1>
-                        @if (!string.IsNullOrWhiteSpace(heroSection.Subheadline))
-                        {
-                            <p class="hero-sub">@heroSection.Subheadline</p>
-                        }
-                        <div class="hero-actions">
-                            @if (!string.IsNullOrWhiteSpace(heroSection.CallToActionLabel) && !string.IsNullOrWhiteSpace(heroSection.CallToActionUrl))
+                            <img src="@ImageDelivery.Cropped(heroSection.ImageUrl, 1600, 900)" alt="" width="1600" height="900"
+                                 decoding="async" fetchpriority="high" />
+                        </div>
+                    }
+                    <div class="hero-body">
+                        <div class="wrap">
+                            @if (!string.IsNullOrWhiteSpace(site.Meta.Tagline))
                             {
-                                <a class="button" href="@heroSection.CallToActionUrl">@heroSection.CallToActionLabel</a>
+                                <span class="eyebrow">@site.Meta.Tagline</span>
                             }
-                            @if (contactDetails is not null && !string.IsNullOrWhiteSpace(contactDetails.WhatsAppNumber))
+                            <h1>@heroSection.Headline</h1>
+                            @if (!string.IsNullOrWhiteSpace(heroSection.Subheadline))
                             {
-                                <a class="button button-ghost" href="https://wa.me/@contactDetails.WhatsAppNumber.TrimStart('+')">WhatsApp us</a>
+                                <p class="hero-sub">@heroSection.Subheadline</p>
+                            }
+                            <div class="hero-actions">
+                                @if (!string.IsNullOrWhiteSpace(heroSection.CallToActionLabel) &&
+                        !string.IsNullOrWhiteSpace(heroSection.CallToActionUrl))
+                                {
+                                    <a class="button" href="@heroSection.CallToActionUrl">@heroSection.CallToActionLabel</a>
+                                }
+                                @if (contactDetails is not null && !string.IsNullOrWhiteSpace(contactDetails.WhatsAppNumber))
+                                {
+                                    <a class="button button-ghost"
+                                       href="https://wa.me/@contactDetails.WhatsAppNumber.TrimStart('+')">WhatsApp us</a>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </header>
+                break;
+
+            case AboutSection about:
+                <section id="@anchors[section]">
+                    <div class="wrap about-layout">
+                        <div>
+                            <h2>@about.Heading</h2>
+                            @foreach (var paragraph in about.Body.Split('\n', StringSplitOptions.RemoveEmptyEntries |
+                    StringSplitOptions.TrimEntries))
+                            {
+                                <p>@paragraph</p>
+                            }
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(about.ImageUrl))
+                        {
+                            <img src="@ImageDelivery.Sized(about.ImageUrl, 1200)" alt="" loading="lazy" decoding="async" />
+                        }
+                    </div>
+                </section>
+                break;
+
+            case ServicesSection services:
+                <section id="@anchors[section]">
+                    <div class="wrap">
+                        <h2>@services.Heading</h2>
+                        <div class="grid">
+                            @foreach (var item in services.Items)
+                            {
+                                <div class="card">
+                                    <h3>@item.Title</h3>
+                                    <p>@item.Description</p>
+                                    @if (!string.IsNullOrWhiteSpace(item.PriceLabel))
+                                    {
+                                        <p class="price">@item.PriceLabel</p>
+                                    }
+                                </div>
                             }
                         </div>
                     </div>
-                </div>
-            </header>
-            break;
+                </section>
+                break;
 
-        case AboutSection about:
-            <section id="@anchors[section]">
-                <div class="wrap about-layout">
-                    <div>
-                        <h2>@about.Heading</h2>
-                        @foreach (var paragraph in about.Body.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                        {
-                            <p>@paragraph</p>
-                        }
+            case GallerySection gallery:
+                <section id="@anchors[section]">
+                    <div class="wrap">
+                        <h2>@gallery.Heading</h2>
+                        <div class="shots">
+                            @foreach (var image in gallery.Images)
+                            {
+                                <figure style="margin:0">
+                                    @* Uniform crop: a grid of photos taken on different phones in
+                                   different orientations otherwise renders as a ragged mess. *@
+                                    <img src="@ImageDelivery.Cropped(image.Url, 800, 600)" alt="@image.AltText" width="800" height="600"
+                                         loading="lazy" decoding="async" />
+                                    @if (!string.IsNullOrWhiteSpace(image.Caption))
+                                    {
+                                        <figcaption class="price">@image.Caption</figcaption>
+                                    }
+                                </figure>
+                            }
+                        </div>
                     </div>
-                    @if (!string.IsNullOrWhiteSpace(about.ImageUrl))
-                    {
-                        <img src="@ImageDelivery.Sized(about.ImageUrl, 1200)"
-                             alt="" loading="lazy" decoding="async" />
-                    }
-                </div>
-            </section>
-            break;
+                </section>
+                break;
 
-        case ServicesSection services:
-            <section id="@anchors[section]">
-                <div class="wrap">
-                    <h2>@services.Heading</h2>
-                    <div class="grid">
-                        @foreach (var item in services.Items)
-                        {
-                            <div class="card">
-                                <h3>@item.Title</h3>
-                                <p>@item.Description</p>
-                                @if (!string.IsNullOrWhiteSpace(item.PriceLabel))
+            case TestimonialsSection testimonials:
+                <section id="@anchors[section]">
+                    <div class="wrap">
+                        <h2>@testimonials.Heading</h2>
+                        <div class="grid">
+                            @foreach (var testimonial in testimonials.Items)
+                            {
+                                <blockquote>
+                                    <p>@testimonial.Quote</p>
+                                    <cite>@testimonial.AuthorName@(string.IsNullOrWhiteSpace(testimonial.AuthorDetail) ? "" : $",                  {testimonial.AuthorDetail}")</cite>
+                                </blockquote>
+                            }
+                        </div>
+                    </div>
+                </section>
+                break;
+
+            case ContactSection contact:
+                <section id="@anchors[section]">
+                    <div class="wrap contact-layout">
+                        <div>
+                            <h2>@contact.Heading</h2>
+                            <ul class="contact-links">
+                                @if (!string.IsNullOrWhiteSpace(contact.PhoneNumber))
                                 {
-                                    <p class="price">@item.PriceLabel</p>
+                                    <li><a href="tel:@contact.PhoneNumber">Call @contact.PhoneNumber</a></li>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(contact.WhatsAppNumber))
+                                {
+                                    <li><a href="https://wa.me/@contact.WhatsAppNumber.TrimStart('+')">Message on WhatsApp</a></li>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(contact.Email))
+                                {
+                                    <li><a href="mailto:@contact.Email">@contact.Email</a></li>
+                                }
+                            </ul>
+                        </div>
+
+                        @if (contact.ShowEnquiryForm)
+                        {
+                            <div>
+                                @* The @@ is load-bearing: the <div> above puts Razor in markup mode, and a
+                           bare "if" here renders as literal text on the customer's live site. *@
+                                @if (ViewData["EnquirySent"] is true)
+                                {
+                                    <p class="enquiry-sent">Thanks — your message has been sent. We'll be in touch soon.</p>
+                                }
+                                else
+                                {
+                                    <form class="enquiry" method="post" action="/">
+                                        @if (ViewData["EnquiryError"] is string enquiryError)
+                                        {
+                                            <p class="enquiry-error">@enquiryError</p>
+                                        }
+                                        <input type="text" name="name" placeholder="Your name" value="@(ViewData["EnquiryName"])"
+                                               required />
+                                        <input type="tel" name="phoneNumber" placeholder="Phone (so we can call you back)"
+                                               value="@(ViewData["EnquiryPhone"])" />
+                                        <input type="email" name="email" placeholder="Email (optional)"
+                                               value="@(ViewData["EnquiryEmail"])" />
+                                        <textarea name="message" rows="4" placeholder="How can we help?"
+                                                  required>@(ViewData["EnquiryMessage"])</textarea>
+                                        @* Honeypot: a real person never fills a hidden field. *@
+                                        <input class="hp" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" />
+                                        <button class="button" type="submit">Send message</button>
+                                    </form>
                                 }
                             </div>
                         }
                     </div>
-                </div>
-            </section>
-            break;
+                </section>
+                break;
 
-        case GallerySection gallery:
-            <section id="@anchors[section]">
-                <div class="wrap">
-                    <h2>@gallery.Heading</h2>
-                    <div class="shots">
-                        @foreach (var image in gallery.Images)
+            case HoursMapSection hoursMap:
+                <section id="@anchors[section]">
+                    <div class="wrap">
+                        <h2>@hoursMap.Heading</h2>
+                        @if (hoursMap.AddressLines.Count > 0)
                         {
-                            <figure style="margin:0">
-                                @* Uniform crop: a grid of photos taken on different phones in
-                                   different orientations otherwise renders as a ragged mess. *@
-                                <img src="@ImageDelivery.Cropped(image.Url, 800, 600)"
-                                     alt="@image.AltText" width="800" height="600" loading="lazy" decoding="async" />
-                                @if (!string.IsNullOrWhiteSpace(image.Caption))
+                            <address>
+                                @foreach (var line in hoursMap.AddressLines)
                                 {
-                                    <figcaption class="price">@image.Caption</figcaption>
+                                    @line
+                                    <br />
                                 }
-                            </figure>
+                            </address>
+                        }
+                        @if (hoursMap.OpeningHours.Count > 0)
+                        {
+                            <table>
+                                <tbody>
+                                    @foreach (var hours in hoursMap.OpeningHours)
+                                    {
+                                        <tr>
+                                            <td>@hours.Day</td>
+                                            <td>
+                                                @if (hours.Closed || hours.Opens is null || hours.Closes is null)
+                                                {
+                                                    @:Closed
+                                                }
+                                                else
+                                                {
+                                                    @($"{hours.Opens:HH\\:mm} – {hours.Closes:HH\\:mm}")
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(hoursMap.MapQuery))
+                        {
+                            <iframe title="Map" loading="lazy" referrerpolicy="no-referrer-when-downgrade"
+                                    src="https://maps.google.com/maps?q=@Uri.EscapeDataString(hoursMap.MapQuery)&output=embed"></iframe>
                         }
                     </div>
-                </div>
-            </section>
-            break;
+                </section>
+                break;
 
-        case TestimonialsSection testimonials:
-            <section id="@anchors[section]">
-                <div class="wrap">
-                    <h2>@testimonials.Heading</h2>
-                    <div class="grid">
-                        @foreach (var testimonial in testimonials.Items)
+            case ShopSection shop:
+                <section id="@anchors[section]">
+                    <div class="wrap">
+                        <h2>@shop.Heading</h2>
+                        @if (!string.IsNullOrWhiteSpace(shop.Intro))
                         {
-                            <blockquote>
-                                <p>@testimonial.Quote</p>
-                                <cite>@testimonial.AuthorName@(string.IsNullOrWhiteSpace(testimonial.AuthorDetail) ? "" : $", {testimonial.AuthorDetail}")</cite>
-                            </blockquote>
+                            <p>@shop.Intro</p>
                         }
-                    </div>
-                </div>
-            </section>
-            break;
-
-        case ContactSection contact:
-            <section id="@anchors[section]">
-                <div class="wrap contact-layout">
-                    <div>
-                    <h2>@contact.Heading</h2>
-                    <ul class="contact-links">
-                        @if (!string.IsNullOrWhiteSpace(contact.PhoneNumber))
+                        @if (products.Count == 0)
                         {
-                            <li><a href="tel:@contact.PhoneNumber">Call @contact.PhoneNumber</a></li>
-                        }
-                        @if (!string.IsNullOrWhiteSpace(contact.WhatsAppNumber))
-                        {
-                            <li><a href="https://wa.me/@contact.WhatsAppNumber.TrimStart('+')">Message on WhatsApp</a></li>
-                        }
-                        @if (!string.IsNullOrWhiteSpace(contact.Email))
-                        {
-                            <li><a href="mailto:@contact.Email">@contact.Email</a></li>
-                        }
-                    </ul>
-                    </div>
-
-                    @if (contact.ShowEnquiryForm)
-                    {
-                        <div>
-                        @* The @@ is load-bearing: the <div> above puts Razor in markup mode, and a
-                           bare "if" here renders as literal text on the customer's live site. *@
-                        @if (ViewData["EnquirySent"] is true)
-                        {
-                            <p class="enquiry-sent">Thanks — your message has been sent. We'll be in touch soon.</p>
+                            @* The owner sees this in preview; a visitor never does, because the shop
+                           section is only worth showing once there is something in it. *@
+                            <p class="muted-note">Nothing in the shop yet. Add your first item from
+                                <strong>Products</strong> in your dashboard and it appears here straight away.
+                            </p>
                         }
                         else
                         {
-                            <form class="enquiry" method="post" action="/">
-                                @if (ViewData["EnquiryError"] is string enquiryError)
+                            <div class="products">
+                                @foreach (var product in products)
                                 {
-                                    <p class="enquiry-error">@enquiryError</p>
+                                    <a class="product" href="/products/@product.Slug">
+                                        @if (!string.IsNullOrWhiteSpace(product.ImageUrl))
+                                        {
+                                            <img src="@ImageDelivery.Cropped(product.ImageUrl, 600, 600)" alt="" width="600" height="600"
+                                                 loading="lazy" decoding="async" />
+                                        }
+                                        <span class="product-body">
+                                            <span class="product-name">@product.Name</span>
+                                            @if (product.DisplayPrice() is { } price)
+                                            {
+                                                <span class="product-price">@price</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="product-price muted">Ask for a price</span>
+                                            }
+                                        </span>
+                                    </a>
                                 }
-                                <input type="text" name="name" placeholder="Your name"
-                                       value="@(ViewData["EnquiryName"])" required />
-                                <input type="tel" name="phoneNumber" placeholder="Phone (so we can call you back)"
-                                       value="@(ViewData["EnquiryPhone"])" />
-                                <input type="email" name="email" placeholder="Email (optional)"
-                                       value="@(ViewData["EnquiryEmail"])" />
-                                <textarea name="message" rows="4" placeholder="How can we help?" required>@(ViewData["EnquiryMessage"])</textarea>
-                                @* Honeypot: a real person never fills a hidden field. *@
-                                <input class="hp" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" />
-                                <button class="button" type="submit">Send message</button>
-                            </form>
+                            </div>
+                            <p class="shop-all"><a class="button" href="/shop">See everything</a></p>
                         }
-                        </div>
-                    }
-                </div>
-            </section>
-            break;
+                    </div>
+                </section>
+                break;
 
-        case HoursMapSection hoursMap:
-            <section id="@anchors[section]">
-                <div class="wrap">
-                    <h2>@hoursMap.Heading</h2>
-                    @if (hoursMap.AddressLines.Count > 0)
-                    {
-                        <address>
-                            @foreach (var line in hoursMap.AddressLines)
-                            {
-                                @line<br />
-                            }
-                        </address>
-                    }
-                    @if (hoursMap.OpeningHours.Count > 0)
-                    {
-                        <table>
-                            <tbody>
-                            @foreach (var hours in hoursMap.OpeningHours)
-                            {
-                                <tr>
-                                    <td>@hours.Day</td>
-                                    <td>
-                                        @if (hours.Closed || hours.Opens is null || hours.Closes is null)
-                                        {
-                                            @:Closed
-                                        }
-                                        else
-                                        {
-                                            @($"{hours.Opens:HH\\:mm} – {hours.Closes:HH\\:mm}")
-                                        }
-                                    </td>
-                                </tr>
-                            }
-                            </tbody>
-                        </table>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(hoursMap.MapQuery))
-                    {
-                        <iframe title="Map" loading="lazy" referrerpolicy="no-referrer-when-downgrade"
-                                src="https://maps.google.com/maps?q=@Uri.EscapeDataString(hoursMap.MapQuery)&output=embed"></iframe>
-                    }
-                </div>
-            </section>
-            break;
-
-        case ShopSection shop:
-            <section id="@anchors[section]">
-                <div class="wrap">
-                    <h2>@shop.Heading</h2>
-                    @if (!string.IsNullOrWhiteSpace(shop.Intro))
-                    {
-                        <p>@shop.Intro</p>
-                    }
-                    @if (products.Count == 0)
-                    {
-                        @* The owner sees this in preview; a visitor never does, because the shop
-                           section is only worth showing once there is something in it. *@
-                        <p class="muted-note">Nothing in the shop yet. Add your first item from
-                            <strong>Products</strong> in your dashboard and it appears here straight away.</p>
-                    }
-                    else
-                    {
-                        <div class="products">
-                            @foreach (var product in products)
-                            {
-                                <a class="product" href="/products/@product.Slug">
-                                    @if (!string.IsNullOrWhiteSpace(product.ImageUrl))
-                                    {
-                                        <img src="@ImageDelivery.Cropped(product.ImageUrl, 600, 600)"
-                                             alt="" width="600" height="600" loading="lazy" decoding="async" />
-                                    }
-                                    <span class="product-body">
-                                        <span class="product-name">@product.Name</span>
-                                        @if (product.DisplayPrice() is { } price)
-                                        {
-                                            <span class="product-price">@price</span>
-                                        }
-                                        else
-                                        {
-                                            <span class="product-price muted">Ask for a price</span>
-                                        }
-                                    </span>
-                                </a>
-                            }
-                        </div>
-                        <p class="shop-all"><a class="button" href="/shop">See everything</a></p>
-                    }
-                </div>
-            </section>
-            break;
-
-        case CtaSection cta:
-            <section class="closing" id="@anchors[section]">
-                <div class="wrap">
-                    <h2>@cta.Headline</h2>
-                    <a class="button" href="@cta.ButtonUrl">@cta.ButtonLabel</a>
-                </div>
-            </section>
-            break;
+            case CtaSection cta:
+                <section class="closing" id="@anchors[section]">
+                    <div class="wrap">
+                        <h2>@cta.Headline</h2>
+                        <a class="button" href="@cta.ButtonUrl">@cta.ButtonLabel</a>
+                    </div>
+                </section>
+                break;
+        }
     }
-}
 
-@await Html.PartialAsync("_SiteFooter", chrome)
+    @await Html.PartialAsync("_SiteFooter", chrome)
 </body>
+
 </html>

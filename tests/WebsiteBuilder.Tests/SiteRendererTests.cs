@@ -102,6 +102,35 @@ public class SiteRendererTests(PostgresFixture fixture) : IDisposable
     }
 
     [Fact]
+    public async Task The_rendered_page_includes_canonical_social_and_structured_data_metadata()
+    {
+        var definition = SampleDefinition();
+        definition.Sections[0] = new HeroSection
+        {
+            Headline = "Blocked drain?",
+            Subheadline = "We come today",
+            ImageUrl = "https://example.test/hero.jpg",
+        };
+        definition.Sections.Add(new HoursMapSection
+        {
+            Heading = "Find us",
+            AddressLines = ["12 High Street", "Accra", "Ghana"],
+            OpeningHours = [new OpeningHours { Day = DayOfWeek.Monday, Opens = new TimeOnly(8, 0), Closes = new TimeOnly(17, 0) }],
+        });
+
+        var (subdomain, _, _) = await SeedSiteAsync(definition: definition);
+
+        var html = Decode(await CreateClient().GetStringAsync($"http://{subdomain}.platform.com/"));
+
+        Assert.Contains("<link rel=\"canonical\"", html);
+        Assert.Contains("property=\"og:title\"", html);
+        Assert.Contains("property=\"og:description\"", html);
+        Assert.Contains("property=\"og:image\"", html);
+        Assert.Contains("application/ld+json", html);
+        Assert.Contains("LocalBusiness", html);
+    }
+
+    [Fact]
     public async Task Preview_nav_links_stay_inside_the_preview()
     {
         // Nav targets are anchors on the home page. Written as "/#services" they threw the owner
