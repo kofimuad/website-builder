@@ -90,7 +90,7 @@ public static class DemoDataSeeder
                 Text = "#15211c",
                 MutedText = "#5a6b64",
             },
-            Fonts = new FontPair { Heading = "Georgia", Body = "system-ui" },
+            Fonts = new FontPair { Heading = "Fraunces", Body = "Inter" },
         },
         Sections =
         [

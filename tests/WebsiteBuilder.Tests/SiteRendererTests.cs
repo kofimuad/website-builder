@@ -101,6 +101,108 @@ public class SiteRendererTests(PostgresFixture fixture) : IDisposable
     }
 
     [Fact]
+    public async Task The_page_carries_a_nav_bar_a_footer_and_a_phone_call_bar()
+    {
+        var (subdomain, _, _) = await SeedSiteAsync();
+
+        var html = Decode(await CreateClient().GetStringAsync($"http://{subdomain}.platform.com/"));
+
+        Assert.Contains("class=\"topbar\"", html);
+        Assert.Contains("class=\"site-footer\"", html);
+        // The one action most visitors to these sites come to take.
+        Assert.Contains("class=\"callbar\"", html);
+        Assert.Contains("tel:+233200000000", html);
+    }
+
+    [Fact]
+    public async Task A_site_with_no_phone_or_whatsapp_gets_no_call_bar()
+    {
+        var definition = SampleDefinition();
+        definition.Sections = [.. definition.Sections.Where(s => s is not ContactSection)];
+        definition.Sections.Add(new ContactSection { Heading = "Get in touch", Email = "joe@example.com" });
+
+        var (subdomain, _, _) = await SeedSiteAsync(definition: definition);
+
+        var html = Decode(await CreateClient().GetStringAsync($"http://{subdomain}.platform.com/"));
+
+        Assert.DoesNotContain("class=\"callbar\"", html);
+        // No bar means no space reserved for one at the bottom of the page.
+        Assert.DoesNotContain("<body class=\"has-callbar\"", html);
+    }
+
+    [Fact]
+    public async Task Fonts_are_declared_inline_and_served_from_our_own_origin()
+    {
+        // A third-party font request is a second DNS lookup and TLS handshake before the page can
+        // be styled, on connections where that is the expensive part.
+        var definition = SampleDefinition();
+        definition.Theme.Fonts = new FontPair { Heading = "Fraunces", Body = "Inter" };
+
+        var (subdomain, _, _) = await SeedSiteAsync(definition: definition);
+        var client = CreateClient();
+
+        var html = Decode(await client.GetStringAsync($"http://{subdomain}.platform.com/"));
+
+        Assert.Contains("@font-face", html);
+        Assert.Contains("/fonts/fraunces-latin-var.woff2", html);
+        Assert.Contains("font-display: swap", html);
+        Assert.DoesNotContain("fonts.googleapis.com", html);
+
+        var font = await client.GetAsync($"http://{subdomain}.platform.com/fonts/inter-latin-var.woff2");
+        Assert.Equal(HttpStatusCode.OK, font.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_theme_naming_a_font_we_do_not_host_downloads_nothing()
+    {
+        // Font names come out of jsonb written by an older build. An unknown one must degrade to a
+        // system stack, never become a request for a file that does not exist.
+        var definition = SampleDefinition();
+        definition.Theme.Fonts = new FontPair { Heading = "Georgia", Body = "system-ui" };
+
+        var (subdomain, _, _) = await SeedSiteAsync(definition: definition);
+
+        var html = Decode(await CreateClient().GetStringAsync($"http://{subdomain}.platform.com/"));
+
+        Assert.DoesNotContain("@font-face", html);
+        Assert.Contains("\"Georgia\", system-ui, sans-serif", html);
+    }
+
+    [Fact]
+    public async Task The_font_stack_reaches_the_css_unescaped()
+    {
+        // Razor escapes by default, and CSS does not decode entities — a stack written as
+        // &quot;Inter&quot; is thrown away by the parser and every site silently loses its type.
+        var definition = SampleDefinition();
+        definition.Theme.Fonts = new FontPair { Heading = "Fraunces", Body = "Inter" };
+
+        var (subdomain, _, _) = await SeedSiteAsync(definition: definition);
+
+        var html = await CreateClient().GetStringAsync($"http://{subdomain}.platform.com/");
+
+        Assert.Contains("--font-heading: \"Fraunces\"", html);
+        Assert.DoesNotContain("&quot;Fraunces&quot;", html);
+    }
+
+    [Fact]
+    public async Task A_font_name_from_older_data_cannot_break_out_of_the_style_block()
+    {
+        // Written unescaped, so the sanitising in WebFontCatalog is the only thing standing between
+        // a jsonb document and the page.
+        var definition = SampleDefinition();
+        definition.Theme.Fonts = new FontPair { Heading = "Bad\";}</style><script>alert(1)</script>", Body = "Inter" };
+
+        var (subdomain, _, _) = await SeedSiteAsync(definition: definition);
+
+        var html = await CreateClient().GetStringAsync($"http://{subdomain}.platform.com/");
+
+        Assert.DoesNotContain("<script>", html);
+        Assert.DoesNotContain("</style>alert", html);
+        // Only letters, digits, spaces and hyphens survive, so the declaration stays a declaration.
+        Assert.Matches("--font-heading: \"[A-Za-z0-9 -]+\", system-ui, sans-serif;", html);
+    }
+
+    [Fact]
     public async Task A_generated_category_site_renders_its_stock_photography()
     {
         // The catalog is only worth having if the photographs survive generation, storage as jsonb,

@@ -42,7 +42,7 @@ The onboarding **live preview** is the real generator run against the answers so
 static picture of a plumbing site until 2026-08-08, which meant it showed a mechanic invented
 guarantees and a headline about blocked drains.
 
-**Tests:** 368 total, all passing, and the suite makes no model API calls at all — see §11.
+**Tests:** 386 total, all passing, and the suite makes no model API calls at all — see §11.
 
 ---
 
@@ -254,6 +254,32 @@ friendlier" helper), `InMemoryAssistantRateLimiter` (usage gate).
 Themes: `ThemePresetCatalog` holds curated palettes; `Wcag` checks contrast so a generated theme is
 always legible.
 
+### How a published site looks
+
+Rebuilt 2026-08-09, warm and local. The page furniture is not optional decoration — each piece is
+there for a reason:
+
+- **A sticky call bar on phones.** Fixed to the bottom, `Call now` and `WhatsApp`, shown only when
+  the profile has those numbers and hidden above 45rem. This audience calls and messages; making
+  that one thumb press from anywhere is worth more than anything else on the page.
+- **A top bar** naming sections by their own heading, so a restaurant's says "Our menu".
+- **A hero that uses its photograph** as a full-bleed image with a gradient scrim and the text over
+  it, rather than a picture dropped under the button. The scrim exists because the photo is one we
+  have never seen, taken on a phone we do not control.
+- **A footer**, cards with real borders and shadow, a coloured closing section, and a two-column
+  about and contact once there is room.
+
+**Fonts are self-hosted** — `WebFontCatalog`, two latin-subset variable files in `wwwroot/fonts`
+(Fraunces for headings, Inter for body; both SIL OFL). Before this, every theme named a system font
+like Georgia or Impact and every site rendered in the device default, which was most of why they
+looked unfinished. A third-party font request would be a second DNS lookup and TLS handshake before
+the page can be styled, which on these connections is the expensive part.
+
+A theme naming a font we do not host degrades to a system stack and downloads nothing — font names
+come out of jsonb an older build wrote, so they are treated as data. `StackFor` strips them to
+letters, digits, spaces and hyphens because the stack is written into the `<style>` block
+**unescaped**: CSS reads `&quot;` as four literal characters and discards the declaration.
+
 ---
 
 ## 6. Accounts and access
@@ -322,6 +348,13 @@ from anywhere else passes through untouched so sites built before uploads existe
 
 **Signing is server-side.** An unsigned Cloudinary preset name is visible in page source and
 effectively world-writable. `Images:ApiSecret` must never reach the browser.
+
+**The multipart body has to be built by hand.** `StringContent` stamps
+`Content-Type: text/plain` on every part, and Cloudinary reads a part with a content type as a
+*file* — so `api_key`, `timestamp` and `signature` vanished and it rejected the upload as unsigned.
+The field names also have to be quoted; .NET writes them bare. Both are pinned by
+`CloudinaryUploadTests`, because the error Cloudinary returns for it — "Upload preset must be
+specified when using unsigned upload" — describes a different mistake entirely.
 
 Half-configured credentials refuse to start — the only symptom otherwise is an editor that never
 shows the upload button, which is a long way from the cause.

@@ -50,13 +50,14 @@ public sealed class CloudinaryImageStore(
         var file = new StreamContent(content);
         file.Headers.ContentType = MediaTypeHeaderValue.Parse(contentType);
         form.Add(file, "file", SafeFileName(fileName));
-        form.Add(new StringContent(_options.ApiKey!), "api_key");
-        form.Add(new StringContent(timestamp), "timestamp");
-        form.Add(new StringContent(folder), "folder");
+
+        AddField(form, "api_key", _options.ApiKey!);
+        AddField(form, "timestamp", timestamp);
+        AddField(form, "folder", folder);
 
         // Signed parameters are every parameter except the file, the api_key and the signature
         // itself, sorted by name. Getting this wrong returns a 401 that says nothing useful.
-        form.Add(new StringContent(Sign($"folder={folder}&timestamp={timestamp}")), "signature");
+        AddField(form, "signature", Sign($"folder={folder}&timestamp={timestamp}"));
 
         HttpResponseMessage response;
         try
@@ -100,6 +101,33 @@ public sealed class CloudinaryImageStore(
             secureUrl,
             root.TryGetProperty("width", out var w) ? w.GetInt32() : 0,
             root.TryGetProperty("height", out var h) ? h.GetInt32() : 0);
+    }
+
+    /// <summary>
+    /// Adds one plain form field.
+    /// <para>
+    /// Two details, both learned from a production 400. <c>StringContent</c> stamps
+    /// <c>Content-Type: text/plain; charset=utf-8</c> on the part, and Cloudinary reads any part
+    /// with a content type as a *file* rather than a parameter — so api_key, timestamp and
+    /// signature all vanish and the upload is treated as unsigned. And the field name has to be
+    /// quoted: <c>MultipartFormDataContent.Add(content, name)</c> writes it bare, which RFC 7578
+    /// does not allow and not every parser tolerates.
+    /// </para>
+    /// <para>
+    /// The error Cloudinary returns for all of this is "Upload preset must be specified when using
+    /// unsigned upload", which describes a different mistake entirely.
+    /// </para>
+    /// </summary>
+    private static void AddField(MultipartFormDataContent form, string name, string value)
+    {
+        var field = new StringContent(value);
+        field.Headers.ContentType = null;
+        field.Headers.ContentDisposition = new ContentDispositionHeaderValue("form-data")
+        {
+            Name = $"\"{name}\"",
+        };
+
+        form.Add(field);
     }
 
     private string Sign(string parameters)
