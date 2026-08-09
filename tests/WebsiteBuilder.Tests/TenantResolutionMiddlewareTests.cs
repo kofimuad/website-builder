@@ -31,6 +31,8 @@ public sealed class TenantAppFactory(PostgresFixture fixture) : WebApplicationFa
             //
             // Both names, because Program.cs accepts either. Adding a provider here means adding
             // its key to this list; TestHostGenerationTests is what notices if you forget.
+            ["Anthropic:ApiKey"] = "",
+            ["ANTHROPIC_API_KEY"] = "",
             ["Gemini:ApiKey"] = "",
             ["GEMINI_API_KEY"] = "",
         }));

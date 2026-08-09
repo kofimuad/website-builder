@@ -48,8 +48,8 @@ below is the state before those keys were added; the remaining item is the desig
    outbound SMTP below the Pro plan** and drops the packets rather than refusing them. The app now
    sends over Resend's HTTPS API when `Email__ApiKey` is set. Untried against the real API.
 
-**Tests: 437 total, all passing, ~40s, and free.** `TenantAppFactory` blanks the model API key for
-the test host. The old lone failure —
+**Tests: 441 total, all passing, ~26s, and free.** `TenantAppFactory` blanks every provider's API
+key for the test host. The old lone failure —
 `OnboardingProgressAndPreviewTests.Completing_onboarding_reports_the_real_stages_in_order` — was
 never a defect: with no credit Claude threw, the template fallback ran, and `WritingCopy` was
 reported twice. It passes now because the host never takes the model path.
@@ -58,14 +58,25 @@ reported twice. It passes now because the host never takes the model path.
 
 ## Things a fresh session will get wrong without being told
 
-- **The provider is Gemini, not Claude.** Swapped 2026-08-08 at Kofi's request. Nothing in Core
-  names a vendor now: `IModelJsonCompletion`, `ModelSiteGenerator`, `ModelSectionAssistant`, and
-  one implementation (`GeminiJsonCompletion`) in the web project. The Anthropic client and its
-  package are gone — `git revert` if that is ever reversed.
+- **Both providers are wired, and Anthropic wins when both keys are set.** Nothing in Core names a
+  vendor: `IModelJsonCompletion`, `ModelSiteGenerator`, `ModelSectionAssistant`, and two
+  implementations in the web project (`AnthropicJsonCompletion`, `GeminiJsonCompletion`). Claude
+  was swapped out for Gemini on 2026-08-08 over API credit and brought back alongside it on
+  2026-08-09 when Kofi bought credit. Production currently has only the Gemini key, so **setting
+  `Anthropic__ApiKey` on Railway is what flips it** — no deploy. The startup banner names the
+  winner and warns when the loser's key is still present. `ModelProviderSelectionTests` pins it.
+- **A Claude subscription is not API credit.** Pro, Max, and Claude Code credits fund nothing here
+  and issue no `sk-ant-` key; the key comes from console.anthropic.com. This has now caused
+  confusion twice — say it plainly rather than assuming it is understood.
 - **The test suite used to spend money** — 45 onboarding call sites, each a live Opus 4.8 request.
-  Fixed at the test host; no `ANTHROPIC_API_KEY=""` workaround needed now. Don't undo the blanking
-  in `TenantAppFactory`, and **add any new provider's key name to that list** — the whole point is
-  that a key in user secrets can never reach the test host. `TestHostGenerationTests` guards it.
+  Fixed at the test host: `TenantAppFactory` blanks `Anthropic:ApiKey`, `ANTHROPIC_API_KEY`,
+  `Gemini:ApiKey` and `GEMINI_API_KEY`. Don't undo it, and **add any new provider's key name to
+  that list** — the point is that a key in user secrets can never reach the test host.
+  `TestHostGenerationTests` guards it.
+- **The Anthropic path has never made a live call.** Neither had the Gemini path when it shipped,
+  and that one worked first time; this one has one thing the other did not, which is that Opus 5
+  thinks by default and `MaxTokens` covers thinking as well as the answer. If the first live call
+  fails, look for a truncation error naming `Anthropic:MaxTokens` before looking anywhere else.
 - **The Jira board drifts.** Epic status is frequently wrong; derive it from children. WB-2 currently
   shows In Progress with zero open children, and WB-28 shows To Do although all four of its
   acceptance criteria are now implemented. Nothing has been transitioned — the board is shared with
@@ -113,15 +124,16 @@ reported twice. It passes now because the host never takes the model path.
 
 ## Open decisions waiting on Kofi
 
-**1. ~~Model provider.~~ Decided: Gemini.** Built 2026-08-08. What is left is not a decision but an
-account: create a key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey) and set
-`Gemini:ApiKey`. Until then the template generator serves every site, exactly as it does today.
+**1. ~~Model provider.~~ Settled: both, Anthropic first.** Gemini built 2026-08-08 and live in
+production; Claude added back alongside it 2026-08-09. Nothing is waiting on a decision — the only
+open question is which one Kofi wants running, and that is a Railway variable rather than a code
+change. Set `Anthropic__ApiKey` and Claude takes over on the next restart; unset it and Gemini
+resumes.
 
-Worth knowing when the key exists: `gemini-3.6-flash` is the default and is $1.50/$7.50 per MTok on
-the paid tier against Opus 4.8's $5/$25, with a free tier above it. **Google retires model ids** —
-`gemini-2.0-flash` is already shut down — so `Gemini:Model` is configuration. The first live call
-will be the first live call the code has ever made; watch the log for a 400, which is where a
-rejected schema keyword would show up.
+Worth knowing when choosing: `claude-opus-5` is $5/$25 per MTok against `gemini-3.6-flash`'s
+$1.50/$7.50, so roughly 3× per site, and `Anthropic:Effort` (default `low`) is the lever that
+moves both cost and how long onboarding's spinner runs. Both vendors retire model ids, so
+`Anthropic:Model` and `Gemini:Model` are configuration.
 
 **2. An uncommitted SMTP port-465 guard.** `System.Net.Mail` can only do STARTTLS, so port 465 hangs
 rather than failing — and Resend's docs list 465 as an option. The guard throws at startup with a

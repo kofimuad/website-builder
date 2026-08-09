@@ -1,6 +1,7 @@
-using System.Net.Http.Headers;
+﻿using System.Net.Http.Headers;
 using System.Text.Encodings.Web;
 using System.Text.Unicode;
+using Anthropic;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.EntityFrameworkCore;
@@ -182,27 +183,51 @@ if (authOptions.IsGoogleConfigured)
 builder.Services.AddAuthorization();
 builder.Services.AddCascadingAuthenticationState();
 
-// Site generation. The deterministic template always exists; when a Gemini API key is configured,
+// Site generation. The deterministic template always exists; when a model provider is configured,
 // the model writes the copy and the template becomes the fallback for when it fails or is
 // unavailable.
 builder.Services.AddSingleton<TemplateSiteGenerator>();
 
+builder.Services.Configure<AnthropicOptions>(builder.Configuration.GetSection(AnthropicOptions.SectionName));
 builder.Services.Configure<GeminiOptions>(builder.Configuration.GetSection(GeminiOptions.SectionName));
 
-// GEMINI_API_KEY is the name every Google example uses and the one someone will reach for on
-// Railway; Gemini:ApiKey is the name the rest of this app's configuration would suggest. Accept
-// both rather than make anyone guess, preferring the explicit section.
+// Both providers accept two names for their key: the one the rest of this app's configuration
+// would suggest, and the one every vendor example uses — which is the one someone will reach for
+// on Railway. Accept either rather than make anyone guess, preferring the explicit section.
+var anthropicKey = builder.Configuration[$"{AnthropicOptions.SectionName}:ApiKey"]
+    ?? builder.Configuration["ANTHROPIC_API_KEY"]
+    ?? Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY");
+
 var geminiKey = builder.Configuration[$"{GeminiOptions.SectionName}:ApiKey"]
     ?? builder.Configuration["GEMINI_API_KEY"]
     ?? Environment.GetEnvironmentVariable("GEMINI_API_KEY");
 
-if (string.IsNullOrWhiteSpace(geminiKey))
+// Anthropic wins when both are set. Two providers can be configured at once — a key left behind
+// on Railway is the normal case, not a mistake — so the choice has to be a stated rule rather than
+// registration order, and the startup banner below says which one won.
+var hasAnthropic = !string.IsNullOrWhiteSpace(anthropicKey);
+var hasGemini = !string.IsNullOrWhiteSpace(geminiKey);
+
+if (hasAnthropic)
 {
-    builder.Services.AddSingleton<ISiteGenerator>(sp => sp.GetRequiredService<TemplateSiteGenerator>());
+    builder.Services.Configure<AnthropicOptions>(o => o.ApiKey = anthropicKey!);
+
+    builder.Services.AddSingleton(sp =>
+    {
+        var anthropic = sp.GetRequiredService<IOptions<AnthropicOptions>>().Value;
+
+        return new AnthropicClient
+        {
+            ApiKey = anthropic.ApiKey,
+            Timeout = TimeSpan.FromSeconds(anthropic.TimeoutSeconds),
+        };
+    });
+
+    builder.Services.AddSingleton<IModelJsonCompletion, AnthropicJsonCompletion>();
 }
-else
+else if (hasGemini)
 {
-    builder.Services.Configure<GeminiOptions>(o => o.ApiKey = geminiKey);
+    builder.Services.Configure<GeminiOptions>(o => o.ApiKey = geminiKey!);
 
     builder.Services.AddHttpClient<IModelJsonCompletion, GeminiJsonCompletion>((sp, client) =>
     {
@@ -216,15 +241,22 @@ else
         // default 100 seconds is far longer than anyone will wait.
         client.Timeout = TimeSpan.FromSeconds(60);
     });
+}
 
+if (hasAnthropic || hasGemini)
+{
     builder.Services.AddSingleton<ModelSiteGenerator>();
     builder.Services.AddSingleton<ISiteGenerator>(sp => new FallbackSiteGenerator(
         primary: sp.GetRequiredService<ModelSiteGenerator>(),
         fallback: sp.GetRequiredService<TemplateSiteGenerator>(),
         logger: sp.GetRequiredService<ILogger<FallbackSiteGenerator>>()));
 
-    // The per-section assistant needs the model, so it exists only when the key does.
+    // The per-section assistant needs the model, so it exists only when a key does.
     builder.Services.AddSingleton<ISectionAssistant, ModelSectionAssistant>();
+}
+else
+{
+    builder.Services.AddSingleton<ISiteGenerator>(sp => sp.GetRequiredService<TemplateSiteGenerator>());
 }
 
 // Usage gate for the assistant; harmless when the assistant isn't available.
@@ -249,11 +281,22 @@ app.Logger.LogInformation(
     "Per-section assistant: {Assistant}. Photo uploads: {Images}.",
     tenantOptions.PlatformDomain,
     emailOptions.Describe(),
-    string.IsNullOrWhiteSpace(geminiKey)
-        ? "template only — no Gemini:ApiKey / GEMINI_API_KEY configured"
-        : $"Gemini ({builder.Configuration[$"{GeminiOptions.SectionName}:Model"] ?? new GeminiOptions().Model}), template fallback",
-    string.IsNullOrWhiteSpace(geminiKey) ? "unavailable" : "available",
+    hasAnthropic
+        ? $"Anthropic ({builder.Configuration[$"{AnthropicOptions.SectionName}:Model"] ?? new AnthropicOptions().Model}), template fallback"
+        : hasGemini
+            ? $"Gemini ({builder.Configuration[$"{GeminiOptions.SectionName}:Model"] ?? new GeminiOptions().Model}), template fallback"
+            : "template only — no Anthropic or Gemini key configured",
+    hasAnthropic || hasGemini ? "available" : "unavailable",
     imageOptions.IsConfigured ? $"Cloudinary ({imageOptions.CloudName})" : "unavailable");
+
+// A leftover key is not an error, but silently ignoring a provider someone believes is live is the
+// kind of thing that gets debugged for an hour.
+if (hasAnthropic && hasGemini)
+{
+    app.Logger.LogWarning(
+        "Both an Anthropic and a Gemini key are configured. Anthropic wins; the Gemini key is " +
+        "unused. Remove one to make the choice obvious from the variables alone.");
+}
 
 // Deployed with the default, every real host classifies as an unmapped custom domain and the whole
 // platform answers 404 — including the marketing page. Warned rather than thrown because the test

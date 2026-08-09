@@ -32,7 +32,7 @@ Stripe.
 | Feature | Why it's inert |
 | --- | --- |
 | Photo uploads (Cloudinary) | No Cloudinary account exists, so `Images:*` is unset. Onboarding and the editor both hide the upload UI |
-| AI site generation (Gemini) | **No `GEMINI_API_KEY` yet.** Sites fall back to the deterministic template. Startup logs which is live |
+| AI site generation | Live in production on Gemini. Claude is wired too and takes precedence the moment `Anthropic__ApiKey` is set; the startup banner names the winner |
 | Sign-in email | Resend is DNS-verified, but whether the Railway variables are set is unconfirmed |
 
 **Not built at all:** billing, admin tooling, SEO metadata, custom domains, rollback, analytics.
@@ -196,9 +196,42 @@ unavailable, or out of credit.
 
 ### The model provider
 
-**Gemini, via `generateContent`.** `IModelJsonCompletion` is a one-method interface; the single
-implementation is `GeminiJsonCompletion` in the web project, which is the only file that knows
-which provider is in use. Nothing in Core names a vendor.
+**Two are wired; whichever has a key wins, Anthropic first.** `IModelJsonCompletion` is a
+one-method interface. Both implementations live in the web project, which is the only place that
+names a vendor — nothing in Core does.
+
+| Key present | Provider | Implementation |
+| --- | --- | --- |
+| `Anthropic:ApiKey` / `ANTHROPIC_API_KEY` | Claude, default `claude-opus-5` | `AnthropicJsonCompletion` |
+| `Gemini:ApiKey` / `GEMINI_API_KEY` only | Gemini, default `gemini-3.6-flash` | `GeminiJsonCompletion` |
+| Neither | — | `TemplateSiteGenerator` alone |
+
+Both keys can be set at once — a key left over on Railway from the last provider is the normal
+case, not a mistake — so **the precedence is a stated rule rather than registration order**:
+Anthropic wins, the startup banner names the winner, and a warning line says the other key is
+unused. `ModelProviderSelectionTests` pins all four rows.
+
+#### Claude (`AnthropicJsonCompletion`)
+
+- **Through the official SDK**, not raw HTTP — unlike Gemini. The SDK is Anthropic's own, it models
+  structured outputs as a first-class parameter, and `SiteGenerationSchema` crosses with no
+  translation at all: Anthropic *requires* the `additionalProperties: false` and `required` that
+  Gemini rejects.
+- **`Anthropic:MaxTokens` defaults to 16000, not 8000.** Opus 5 thinks by default and the ceiling
+  covers thinking *and* the answer together, so a budget sized for the copy alone truncates the
+  JSON mid-object and nothing parses.
+- **`Anthropic:Effort` defaults to `low`.** Writing marketing copy from a filled-in form is not a
+  reasoning problem, and this call runs in the foreground of onboarding with someone watching a
+  spinner. Effort is the lever for how long they watch and what the site costs to make.
+- **A refusal is checked before the content is read.** Safety classifiers can decline and still
+  answer 200 with an empty body; without the check the symptom is an inscrutable "no text" error
+  rather than the reason.
+- **$5/$25 per MTok** at list, against Gemini Flash's $1.50/$7.50 — roughly 3× per site.
+- **API credit is not a subscription.** Claude Pro, Max and Claude Code fund nothing here and issue
+  no `sk-ant-` key. This has caused real confusion twice; `AnthropicOptions.ApiKey` says so in a
+  doc comment because that is where someone will be looking when it happens again.
+
+#### Gemini (`GeminiJsonCompletion`)
 
 - **Plain `HttpClient`, no SDK.** One request, one JSON response, a stable documented wire format.
   A dependency on someone else's release cadence is a poor trade for the lines it would save, and
@@ -206,12 +239,9 @@ which provider is in use. Nothing in Core names a vendor.
 - **The model id is configuration** (`Gemini:Model`, default `gemini-3.6-flash`). Google retires
   ids on a schedule — `gemini-2.0-flash` is already shut down — so moving to the next one is a
   Railway variable, not a deploy.
-- **The schema crosses unchanged.** Gemini's `responseSchema` accepts the subset of OpenAPI 3.0
-  that covers everything in `SiteGenerationSchema`, including `additionalProperties`. No
-  translation layer, because a translation layer is one more thing that can be silently wrong.
 - **Prices live with the provider.** `ModelCompletionResult` carries the cost the implementation
-  worked out. When the previous provider's per-token prices were constants inside the generator,
-  swapping providers would have kept reporting the old numbers.
+  worked out. When per-token prices were constants inside the generator, swapping providers would
+  have kept reporting the old numbers — which is exactly what having two of them now would do.
 - **Five JSON Schema keywords are stripped** before the schema is sent — `additionalProperties`,
   `$schema`, `$id`, `$defs`, `definitions`. `responseSchema` is an OpenAPI 3.0 subset and does not
   define them; sending one is a 400. None of them constrain what the model may return here, so
@@ -221,8 +251,9 @@ which provider is in use. Nothing in Core names a vendor.
   template site — because the visible symptom of a failed model call is nothing more than
   unexpectedly generic copy, which reads as "the AI isn't working" with nothing to point at.
 
-Previously Anthropic Claude, removed in favour of Gemini; the implementation is one `git revert`
-away if that decision is reversed.
+Claude was the original provider, replaced by Gemini on 2026-08-08 over API credit, and brought
+back alongside it on 2026-08-09 when credit was bought. Keeping both is cheap — one options class
+and one branch each — and the second swap proved the first was not a one-off.
 
 ### Category templates (WB-45)
 
@@ -505,7 +536,11 @@ domain is *unreachable*, not merely insecure.
 | `Email__FromAddress` | **Required** once either is set |
 | `Images__CloudName` / `ApiKey` / `ApiSecret` | All three or none |
 | `Auth__GoogleClientId` / `GoogleClientSecret` | Optional pair |
-| `Gemini__ApiKey` or `GEMINI_API_KEY` | Optional. Without it, the template generator runs |
+| `Anthropic__ApiKey` or `ANTHROPIC_API_KEY` | Optional. **Wins over Gemini when both are set.** An `sk-ant-` key from console.anthropic.com — a Claude subscription is not this |
+| `Anthropic__Model` | Defaults to `claude-opus-5` |
+| `Anthropic__Effort` | `low` \| `medium` \| `high` \| `xhigh` \| `max`. Defaults to `low`; the cost and latency lever |
+| `Anthropic__MaxTokens` | Defaults to 16000. Covers thinking *and* the answer — lowering it truncates the JSON |
+| `Gemini__ApiKey` or `GEMINI_API_KEY` | Optional. Used only when no Anthropic key is set |
 | `Gemini__Model` | Defaults to `gemini-3.6-flash`. Set this when Google retires an id |
 
 ### Testing
