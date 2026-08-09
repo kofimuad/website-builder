@@ -364,7 +364,22 @@
 
     private string NextLabel => _wizard.CurrentStep == OnboardingStep.ServiceArea
         ? "Build my website"
-        : OnboardingWizard.IsOptional(_wizard.CurrentStep) ? "Skip" : "Continue";
+        : OnboardingWizard.IsOptional(_wizard.CurrentStep) && !HasAnswered(_wizard.CurrentStep)
+            ? "Skip"
+            : "Continue";
+
+    /// <summary>
+    /// Whether an optional step has been given something. "Skip" is the honest label for an empty
+    /// optional question and a worrying one after you have just uploaded six photos — it reads as
+    /// though the work is about to be thrown away.
+    /// </summary>
+    private bool HasAnswered(OnboardingStep step) => step switch
+    {
+        OnboardingStep.Photos => _wizard.Answers.PhotoUrls.Count > 0,
+        OnboardingStep.ServiceArea => !string.IsNullOrWhiteSpace(_wizard.Answers.ServiceArea)
+                                      || !string.IsNullOrWhiteSpace(_addressText),
+        _ => false,
+    };
 
     // Straight from the category catalog, so a template added there shows up here. Free text still
     // works — these exist so the common cases land on a curated page without the owner having to

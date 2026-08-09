@@ -170,7 +170,9 @@
                     @if (contact.ShowEnquiryForm)
                     {
                         <div>
-                        if (ViewData["EnquirySent"] is true)
+                        @* The @@ is load-bearing: the <div> above puts Razor in markup mode, and a
+                           bare "if" here renders as literal text on the customer's live site. *@
+                        @if (ViewData["EnquirySent"] is true)
                         {
                             <p class="enquiry-sent">Thanks — your message has been sent. We'll be in touch soon.</p>
                         }

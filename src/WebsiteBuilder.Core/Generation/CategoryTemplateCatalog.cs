@@ -31,6 +31,9 @@ public static class CategoryTemplateCatalog
             "restaurant*", "chop bar", "chopbar", "cafe", "café", "coffee", "food", "kitchen*",
             "catering", "caterer*", "baker*", "pastr*", "grill*", "takeaway", "take away",
             "canteen*", "pizza*", "juice", "jollof", "waakye", "fast food", "eatery",
+            // "Cooking" is how a home caterer describes themselves, and it was falling through to
+            // the general template — a clothes-shop hero photo on a kitchen business.
+            "cook*", "chef*", "snack*", "pepper soup", "khebab", "kebab*", "smoothie*",
         ],
         Lineup:
         [

@@ -30,7 +30,14 @@ public sealed class FallbackSiteGenerator(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "AI generation failed for {Business}; using the template site instead.", profile.BusinessName);
+            // Error, not warning: the site still gets built, so the only symptom anyone sees is
+            // unexpectedly generic copy — which reads as "the AI isn't working" with nothing to
+            // point at. This line is the whole explanation, so it should be hard to miss.
+            logger.LogError(
+                ex,
+                "AI GENERATION FAILED for {Business} — falling back to the template site. The copy " +
+                "on this site was written by the deterministic generator, not the model.",
+                profile.BusinessName);
             return await fallback.GenerateAsync(profile, progress, cancellationToken);
         }
     }

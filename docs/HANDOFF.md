@@ -48,7 +48,7 @@ below is the state before those keys were added; the remaining item is the desig
    outbound SMTP below the Pro plan** and drops the packets rather than refusing them. The app now
    sends over Resend's HTTPS API when `Email__ApiKey` is set. Untried against the real API.
 
-**Tests: 421 total, all passing, ~15s, and free.** `TenantAppFactory` blanks the model API key for
+**Tests: 430 total, all passing, ~15s, and free.** `TenantAppFactory` blanks the model API key for
 the test host. The old lone failure —
 `OnboardingProgressAndPreviewTests.Completing_onboarding_reports_the_real_stages_in_order` — was
 never a defect: with no credit Claude threw, the template fallback ran, and `WritingCopy` was
@@ -78,6 +78,12 @@ reported twice. It passes now because the host never takes the model path.
 - **`ui.pen` is encrypted.** It cannot be read or edited with normal file tools, only through the
   Pencil MCP with the file open in the editor — which only Kofi can do. It still says "Sitely" in
   nine places.
+- **Razor: a `<div>` around a code block switches the parser into markup mode**, and a bare `if`
+  after it renders as literal text on the customer's live site. It shipped that way once, showing
+  `if (ViewData["EnquirySent"] is true) {` above every contact form.
+  `SiteRendererTests.No_razor_source_leaks_into_the_rendered_page` guards it now.
+- **A generic-looking site is not proof the model failed.** The onboarding preview never calls it,
+  by design. Check the startup banner and grep the log for `AI GENERATION FAILED`.
 - **Railway blocks outbound SMTP below the Pro plan**, by dropping packets. Anything that needs an
   outbound port other than 443 will look like a hang, not an error. Reach for an HTTPS API first.
 - **Railway variable names use `__`, not `:`.** A variable called `Gemini` does nothing; the app

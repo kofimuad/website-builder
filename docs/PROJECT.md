@@ -38,11 +38,14 @@ Stripe.
 **Not built at all:** billing, admin tooling, SEO metadata, custom domains, rollback, analytics.
 
 The onboarding **live preview** is the real generator run against the answers so far — the same
-`TemplateSiteGenerator` that builds the site, projected into a small browser mock-up. It was a
+`TemplateSiteGenerator` that builds the site, projected into a small browser mock-up. **It never
+calls the model**: it rebuilds on every keystroke, so it shows structure, imagery and layout rather
+than final copy. A preview that reads generically is therefore not evidence the model is broken —
+the startup banner and any `AI GENERATION FAILED` line in the log are. It was a
 static picture of a plumbing site until 2026-08-08, which meant it showed a mechanic invented
 guarantees and a headline about blocked drains.
 
-**Tests:** 421 total, all passing, and the suite makes no model API calls at all — see §11.
+**Tests:** 430 total, all passing, and the suite makes no model API calls at all — see §11.
 
 ---
 
@@ -209,9 +212,14 @@ which provider is in use. Nothing in Core names a vendor.
 - **Prices live with the provider.** `ModelCompletionResult` carries the cost the implementation
   worked out. When the previous provider's per-token prices were constants inside the generator,
   swapping providers would have kept reporting the old numbers.
+- **Five JSON Schema keywords are stripped** before the schema is sent — `additionalProperties`,
+  `$schema`, `$id`, `$defs`, `definitions`. `responseSchema` is an OpenAPI 3.0 subset and does not
+  define them; sending one is a 400. None of them constrain what the model may return here, so
+  dropping them costs nothing.
 - **Errors are loud.** A non-2xx keeps Google's own message; `MAX_TOKENS` and `SAFETY` throw rather
-  than returning half a site. The fallback still catches all of it, so the visible symptom is
-  generic copy — the log is the only place the reason survives.
+  than returning half a site. `FallbackSiteGenerator` then logs at **Error** and builds the
+  template site — because the visible symptom of a failed model call is nothing more than
+  unexpectedly generic copy, which reads as "the AI isn't working" with nothing to point at.
 
 Previously Anthropic Claude, removed in favour of Gemini; the implementation is one `git revert`
 away if that decision is reversed.

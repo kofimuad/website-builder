@@ -109,6 +109,59 @@ public class GeminiCompletionTests
     }
 
     [Fact]
+    public async Task Keywords_gemini_does_not_accept_are_stripped_from_the_schema()
+    {
+        // responseSchema is an OpenAPI 3.0 subset, and additionalProperties is not in it. Sending
+        // one is a 400 — which is invisible, because generation falls back to the template and the
+        // site merely reads generically.
+        var (completion, handler) = Build(Reply("{}"));
+
+        await completion.CompleteAsync("system", "user", SiteGenerationSchema.Build());
+
+        Assert.DoesNotContain("additionalProperties", handler.LastBody);
+        Assert.DoesNotContain("$schema", handler.LastBody);
+    }
+
+    [Fact]
+    public async Task Stripping_happens_at_every_level_not_just_the_top()
+    {
+        // The services array's item schema carries its own additionalProperties.
+        var (completion, handler) = Build(Reply("{}"));
+
+        await completion.CompleteAsync("system", "user", SiteGenerationSchema.Build());
+
+        using var sent = JsonDocument.Parse(handler.LastBody!);
+        var services = sent.RootElement
+            .GetProperty("generationConfig").GetProperty("responseSchema")
+            .GetProperty("properties").GetProperty("services").GetProperty("items");
+
+        Assert.False(services.TryGetProperty("additionalProperties", out _));
+        // What actually constrains the model is still intact.
+        Assert.True(services.GetProperty("properties").TryGetProperty("title", out _));
+        Assert.Equal("object", services.GetProperty("type").GetString());
+    }
+
+    [Fact]
+    public async Task What_constrains_the_model_survives_the_stripping()
+    {
+        var (completion, handler) = Build(Reply("{}"));
+
+        await completion.CompleteAsync("system", "user", SiteGenerationSchema.Build());
+
+        using var sent = JsonDocument.Parse(handler.LastBody!);
+        var schema = sent.RootElement.GetProperty("generationConfig").GetProperty("responseSchema");
+
+        Assert.Equal("object", schema.GetProperty("type").GetString());
+        Assert.True(schema.TryGetProperty("required", out var required));
+        Assert.Contains("heroHeadline", required.EnumerateArray().Select(e => e.GetString()));
+        // The palette enum is how the model is kept to a theme we have contrast-checked.
+        Assert.Contains(
+            "friendly",
+            schema.GetProperty("properties").GetProperty("palette").GetProperty("enum")
+                .EnumerateArray().Select(e => e.GetString()));
+    }
+
+    [Fact]
     public async Task The_model_id_is_in_the_path_so_switching_model_needs_no_code()
     {
         var (completion, handler) = Build(Reply("{}"),

@@ -17,9 +17,8 @@ namespace WebsiteBuilder.Web.Generation;
 /// </para>
 /// <para>
 /// Structured output is requested with <c>responseSchema</c>, which takes the same JSON Schema the
-/// rest of the codebase uses — Gemini accepts a subset of OpenAPI 3.0 that covers everything in
-/// <see cref="SiteGenerationSchema"/>. The schema is passed through unchanged rather than
-/// translated: a translation layer would be one more thing that can be silently wrong.
+/// rest of the codebase uses, minus a handful of keywords the OpenAPI 3.0 subset does not define —
+/// see <c>ToNode</c>.
 /// </para>
 /// </summary>
 public sealed class GeminiJsonCompletion(HttpClient http, IOptions<GeminiOptions> options)
@@ -143,15 +142,63 @@ public sealed class GeminiJsonCompletion(HttpClient http, IOptions<GeminiOptions
         inputTokens / 1_000_000m * _options.InputPricePerMillion
         + outputTokens / 1_000_000m * _options.OutputPricePerMillion;
 
+    /// <summary>
+    /// Keywords that are valid JSON Schema but are not in the OpenAPI 3.0 subset Gemini accepts
+    /// for <c>responseSchema</c>. Sending one is a 400, and a 400 here is invisible: generation
+    /// falls back to the template and the site simply reads generically.
+    /// </summary>
+    private static readonly HashSet<string> Unsupported =
+        new(StringComparer.Ordinal) { "additionalProperties", "$schema", "$id", "$defs", "definitions" };
+
+    /// <summary>
+    /// Copies the schema, dropping the keywords above at every level.
+    /// <para>
+    /// This is a translation layer, which is the thing this class set out not to have. It earns its
+    /// place: the list is five names rather than a dialect, dropping them cannot change what the
+    /// schema permits in any way that matters here (the properties and their types are what
+    /// constrain the model), and the alternative is a provider that answers 400 to every request
+    /// while the product looks like it is merely uninspired.
+    /// </para>
+    /// </summary>
     private static JsonNode ToNode(IReadOnlyDictionary<string, JsonElement> schema)
     {
         var node = new JsonObject();
+
         foreach (var (key, value) in schema)
         {
-            node[key] = JsonSerializer.SerializeToNode(value);
+            if (Unsupported.Contains(key))
+            {
+                continue;
+            }
+
+            node[key] = Clean(JsonSerializer.SerializeToNode(value));
         }
 
         return node;
+    }
+
+    private static JsonNode? Clean(JsonNode? node)
+    {
+        switch (node)
+        {
+            case JsonObject o:
+                var copy = new JsonObject();
+                foreach (var (key, value) in o)
+                {
+                    if (!Unsupported.Contains(key))
+                    {
+                        copy[key] = Clean(value);
+                    }
+                }
+
+                return copy;
+
+            case JsonArray a:
+                return new JsonArray(a.Select(Clean).ToArray());
+
+            default:
+                return node?.DeepClone();
+        }
     }
 
     /// <summary>Error bodies can carry the whole echoed request; keep the log readable.</summary>

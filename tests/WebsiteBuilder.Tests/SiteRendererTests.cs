@@ -101,6 +101,50 @@ public class SiteRendererTests(PostgresFixture fixture) : IDisposable
     }
 
     [Fact]
+    public async Task No_razor_source_leaks_into_the_rendered_page()
+    {
+        // Wrapping a block in a <div> puts Razor into markup mode, and a bare "if" after that
+        // renders as literal text. It shipped that way: customers' contact sections showed
+        // "if (ViewData["EnquirySent"] is true) {" above the form. Nothing in the suite noticed,
+        // because every assertion was about content that was still present.
+        var definition = SampleDefinition();
+        definition.Sections.Add(new GallerySection
+        {
+            Heading = "Our work",
+            Images = [new GalleryImage { Url = "https://example.test/a.jpg", AltText = "A job" }],
+        });
+        definition.Sections.Add(new AboutSection { Heading = "About us", Body = "A line." });
+        definition.Sections.Add(new HoursMapSection { Heading = "Find us", AddressLines = ["12 High Street"] });
+        definition.Sections.Add(new TestimonialsSection
+        {
+            Heading = "Reviews",
+            Items = [new Testimonial { Quote = "Great", AuthorName = "Ama" }],
+        });
+
+        var (subdomain, _, _) = await SeedSiteAsync(definition: definition);
+
+        var html = Decode(await CreateClient().GetStringAsync($"http://{subdomain}.platform.com/"));
+
+        // Fragments of C# that can only appear if a code block escaped into markup.
+        foreach (var leak in new[] { "ViewData[", "@if", "@foreach", "string.IsNullOrWhiteSpace", "Model." })
+        {
+            Assert.DoesNotContain(leak, html);
+        }
+    }
+
+    [Fact]
+    public async Task The_enquiry_form_renders_its_fields_rather_than_its_source()
+    {
+        var (subdomain, _, _) = await SeedSiteAsync();
+
+        var html = Decode(await CreateClient().GetStringAsync($"http://{subdomain}.platform.com/"));
+
+        Assert.Contains("name=\"message\"", html);
+        Assert.Contains("Send message", html);
+        Assert.DoesNotContain("EnquirySent", html);
+    }
+
+    [Fact]
     public async Task The_page_carries_a_nav_bar_a_footer_and_a_phone_call_bar()
     {
         var (subdomain, _, _) = await SeedSiteAsync();
