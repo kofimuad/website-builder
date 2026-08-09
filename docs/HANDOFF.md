@@ -1,6 +1,6 @@
 # Session handoff — CS Build
 
-Paste this into a new chat to continue where the last one stopped. Written 2026-08-08.
+Paste this into a new chat to continue where the last one stopped. Last updated 2026-08-09.
 
 > Read `docs/PROJECT.md` first — it describes the whole codebase. This file covers only what is
 > *live, decided, or pending* right now, and the things a fresh session would otherwise get wrong.
@@ -18,18 +18,36 @@ project **WB** on `csharpworks.atlassian.net` (cloudId `69108580-d8d9-4c90-a102-
 
 ## State as of this handoff
 
-`main` is at **`4c14a36`**, deployed and live. **Everything below is uncommitted and unpushed, so
-production is running none of it** — a live check of csbuild.app shows the old behaviour, which has
-already caused confusion once. The working tree holds: the SMTP port-465 guard (see "Open
-decisions"), the test-cost fix, WB-45 category templates, the onboarding live preview, onboarding
-photo uploads (with a migration), and the move from Claude to Gemini.
+`main` is at **`0236c55`**, committed and pushed. Kofi commits as work lands, so a clean working
+tree is the normal state — check `git log` rather than assuming, as an earlier version of this file
+claimed everything was unpushed long after it had been.
 
 **Working in production:** apex + wildcard TLS on `csbuild.app`, tenant routing, onboarding →
-generate → edit → publish, the new first-publish address picker and go-live moment, reserved
-subdomains, the CS Build rename.
+generate → edit → publish, the first-publish address picker and go-live moment, reserved
+subdomains, the CS Build rename, WB-45 category templates, the onboarding live preview, the shop
+(ecommerce v1, WhatsApp ordering), and photo uploads.
 
-**As of 2026-08-09 production has email, Gemini and Cloudinary all configured and live.** The list
-below is the state before those keys were added; the remaining item is the design review.
+**Email, Gemini and Cloudinary are all configured and live** as of 2026-08-09. The three "switched
+off" items below are **historical** — kept because the reasoning behind each still matters — but
+none of them is currently blocking anything.
+
+**Added 2026-08-09, after those keys arrived:**
+
+- **Claude is wired again alongside Gemini**, and wins when both keys are set. Production has only
+  the Gemini key today, so setting `Anthropic__ApiKey` is what flips it. See "Things a fresh
+  session will get wrong" below — the credit-vs-subscription trap is the important part.
+- **A round of UI fixes**, all of the same family: unsized inline SVGs and stale dark-theme colours
+  left behind by the light-theme redesign. Icons now carry `width='1em' height='1em'` on the
+  element rather than trusting CSS to reach them; `ImageField` uses tokens instead of `#F2F2F5`;
+  the editor finally has a link back to the dashboard.
+- **`chrome-devtools-mcp` in `.mcp.json`** so a session can actually look at the running app. Every
+  bug in the bullet above was invisible in the source and obvious in a screenshot, and each one
+  cost Kofi a round-trip to report. See `docs/PROJECT.md` → "Looking at the running app".
+
+**Still true and still worth doing:** the DataProtection keys are not persisted, so every deploy
+signs everyone out. Flagged several times, never authorised. And the generated sites look plain —
+that is a template problem (`_SiteStyles.cshtml`, `SiteChrome`, `CategoryTemplateCatalog`), not a
+model problem, because the model only writes copy and picks one of three palettes.
 
 **Three things were switched off, all for account reasons rather than code:**
 
