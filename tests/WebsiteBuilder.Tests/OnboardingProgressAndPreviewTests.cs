@@ -14,6 +14,37 @@ public class OnboardingProgressAndPreviewTests(PostgresFixture fixture) : IDispo
 
     public void Dispose() => _factory.Dispose();
 
+    [Fact]
+    public async Task A_stashed_interview_is_redeemable_exactly_once()
+    {
+        // The whole claim flow rests on this. When /start prerendered, OnInitializedAsync ran
+        // twice: the prerender pass redeemed the stash and built the site, and the circuit pass
+        // found nothing and told the owner their answers had expired — on the run that had just
+        // worked. Fixed by turning prerendering off; pinned here because the store's contract is
+        // what makes the double-run fatal.
+        using var scope = _factory.Services.CreateScope();
+        var store = scope.ServiceProvider.GetRequiredService<OnboardingDraftStore>();
+
+        var key = store.Stash(Answers());
+
+        Assert.NotNull(store.Take(key));
+        Assert.Null(store.Take(key));
+
+        await Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task The_onboarding_page_is_not_prerendered()
+    {
+        // Prerendering this page runs the claim redemption twice. If it is ever turned back on,
+        // the server will render the interview into the response and this fails.
+        var html = await _factory.CreateClient().GetStringAsync("http://platform.com/start");
+
+        Assert.DoesNotContain("What's your business called?", html);
+        // The component is still there — it is just left for the circuit to render.
+        Assert.Contains("blazor", html, StringComparison.OrdinalIgnoreCase);
+    }
+
     private sealed class CollectingProgress : IProgress<OnboardingProgress>
     {
         public List<OnboardingProgress> Stages { get; } = [];

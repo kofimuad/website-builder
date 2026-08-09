@@ -45,7 +45,7 @@ the startup banner and any `AI GENERATION FAILED` line in the log are. It was a
 static picture of a plumbing site until 2026-08-08, which meant it showed a mechanic invented
 guarantees and a headline about blocked drains.
 
-**Tests:** 430 total, all passing, and the suite makes no model API calls at all — see §11.
+**Tests:** 432 total, all passing, and the suite makes no model API calls at all — see §11.
 
 ---
 
@@ -310,6 +310,16 @@ indistinguishable.
 
 The owner id is passed in rather than read from ambient state: inside a Blazor circuit there is no
 `HttpContext`, and a gate that silently sees "no user" would fail open.
+
+**Onboarding and Leads both render with `prerender: false`, and must stay that way.** Prerendering
+runs `OnInitializedAsync` twice — once for the prerender pass, once when the circuit starts. Both
+pages do something once-only in it: Leads marks leads read, and Onboarding redeems the stashed
+interview. With prerendering on, the prerender pass built the site and the circuit pass then found
+an empty stash and told the owner their answers had expired, on the very run that had just
+succeeded. `The_onboarding_page_is_not_prerendered` guards it.
+
+A claim link is also the kind of URL people revisit, so a claim that finds nothing now sends an
+owner who already has a site to their dashboard rather than through the interview again.
 
 Full detail: [accounts-and-access.md](accounts-and-access.md).
 

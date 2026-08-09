@@ -4,11 +4,17 @@
 @using WebsiteBuilder.Core.SiteModel
 @using WebsiteBuilder.Web.Images
 @using WebsiteBuilder.Web.Auth
+@using WebsiteBuilder.Web.Management
 @using WebsiteBuilder.Web.Onboarding
-@rendermode InteractiveServer
+@* Prerender off so OnInitializedAsync runs exactly once. It redeems the stashed interview, and a
+   stash is redeemable once — with prerendering on, the prerender pass built the site and the
+   circuit pass then found nothing and told the owner their answers had expired, on the very run
+   that had just succeeded. Leads.razor is off for the same reason. *@
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
 @inject IServiceProvider Services
 @inject OnboardingService OnboardingService
 @inject OnboardingDraftStore DraftStore
+@inject SiteManagementService Management
 @inject NavigationManager Navigation
 
 <PageTitle>Let's build your website</PageTitle>
@@ -343,9 +349,7 @@
 
         if (stashed is null)
         {
-            // The stash expired or was already claimed. Their answers are gone, so the honest
-            // thing is to start them over rather than build something half-remembered.
-            _problem = "That took a little too long, so we didn't keep your answers. It's only a few questions — let's go again.";
+            await NothingToClaimAsync();
             return;
         }
 
@@ -354,6 +358,33 @@
         _addressText = string.Join("\n", stashed.AddressLines);
 
         await Build();
+    }
+
+    /// <summary>
+    /// The claim key bought nothing: the stash expired, or this link has already been followed.
+    /// <para>
+    /// The second case is far more likely than the first, because a claim link is exactly the kind
+    /// of URL people revisit — from their email a second time, or by refreshing. If the site it
+    /// built already exists, telling its owner to answer seven questions again is both wrong and
+    /// alarming. Only somebody with no site at all is genuinely starting over.
+    /// </para>
+    /// </summary>
+    private async Task NothingToClaimAsync()
+    {
+        var ownerId = await AuthState.OwnerIdAsync();
+
+        if (ownerId is not null)
+        {
+            var sites = await Management.ListForOwnerAsync(ownerId.Value);
+
+            if (sites.Count > 0)
+            {
+                Navigation.NavigateTo("/dashboard");
+                return;
+            }
+        }
+
+        _problem = "That took a little too long, so we didn't keep your answers. It's only a few questions — let's go again.";
     }
 
     private string PlatformSuffix => TenantOptions.Value.PlatformDomain;

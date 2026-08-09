@@ -48,7 +48,7 @@ below is the state before those keys were added; the remaining item is the desig
    outbound SMTP below the Pro plan** and drops the packets rather than refusing them. The app now
    sends over Resend's HTTPS API when `Email__ApiKey` is set. Untried against the real API.
 
-**Tests: 430 total, all passing, ~15s, and free.** `TenantAppFactory` blanks the model API key for
+**Tests: 432 total, all passing, ~15s, and free.** `TenantAppFactory` blanks the model API key for
 the test host. The old lone failure —
 `OnboardingProgressAndPreviewTests.Completing_onboarding_reports_the_real_stages_in_order` — was
 never a defect: with no credit Claude threw, the template fallback ran, and `WritingCopy` was
@@ -78,6 +78,10 @@ reported twice. It passes now because the host never takes the model path.
 - **`ui.pen` is encrypted.** It cannot be read or edited with normal file tools, only through the
   Pencil MCP with the file open in the editor — which only Kofi can do. It still says "Sitely" in
   nine places.
+- **Blazor prerendering runs `OnInitializedAsync` twice.** Any page doing something once-only in it
+  needs `prerender: false` — Onboarding (redeems the interview stash) and Leads (marks leads read)
+  both do. Onboarding shipped with prerendering on and every magic-link claim ended on "that took a
+  little too long", *after* silently building the site.
 - **Razor: a `<div>` around a code block switches the parser into markup mode**, and a bare `if`
   after it renders as literal text on the customer's live site. It shipped that way once, showing
   `if (ViewData["EnquirySent"] is true) {` above every contact form.
