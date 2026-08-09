@@ -1,0 +1,283 @@
+@using WebsiteBuilder.Core.SiteModel
+@using WebsiteBuilder.Web.Pages
+@model SiteChrome
+@{
+    var theme = Model.Theme;
+    var headingStack = Model.HeadingStack;
+    var bodyStack = Model.BodyStack;
+}
+    <style>
+        @foreach (var font in WebFontCatalog.Used(theme))
+        {
+            @:@@font-face {
+            @:  font-family: "@font.Family";
+            @:  src: url("/fonts/@font.FileName") format("woff2-variations");
+            @:  font-weight: 400 700;
+            @*  swap: the words appear immediately in the fallback and restyle when the file lands.
+                On a slow connection, readable now beats correct later. *@
+            @:  font-display: swap;
+            @:}
+        }
+        :root {
+            --primary: @theme.Palette.Primary;
+            --accent: @theme.Palette.Accent;
+            --background: @theme.Palette.Background;
+            --surface: @theme.Palette.Surface;
+            --text: @theme.Palette.Text;
+            --muted: @theme.Palette.MutedText;
+            @* Raw, because CSS reads an escaped quote as four literal characters and discards the
+               declaration. WebFontCatalog.StackFor strips the name to safe characters first. *@
+            --font-heading: @Html.Raw(headingStack);
+            --font-body: @Html.Raw(bodyStack);
+            --edge: color-mix(in srgb, var(--muted) 18%, transparent);
+            --shadow: 0 1px 2px rgb(0 0 0 / .04), 0 8px 24px -12px rgb(0 0 0 / .18);
+            --radius: 1rem;
+        }
+        * { box-sizing: border-box; }
+        html { scroll-behavior: smooth; scroll-padding-top: 5rem; }
+        body {
+            margin: 0;
+            font-family: var(--font-body);
+            color: var(--text);
+            background: var(--background);
+            line-height: 1.65;
+            -webkit-text-size-adjust: 100%;
+        }
+        /* Room for the fixed call bar so the footer is never trapped underneath it. */
+        body.has-callbar { padding-bottom: 4.75rem; }
+        h1, h2, h3 { font-family: var(--font-heading); line-height: 1.12; margin: 0 0 .5em; letter-spacing: -.015em; }
+        h2 { font-size: clamp(1.6rem, 4.5vw, 2.35rem); }
+        h3 { font-size: 1.15rem; }
+        p { margin: 0 0 1rem; }
+        img { max-width: 100%; height: auto; display: block; }
+        a { color: var(--primary); }
+        section { padding: 3.5rem 1.25rem; }
+        section:nth-of-type(even) { background: var(--surface); }
+        .wrap { max-width: 64rem; margin: 0 auto; }
+
+        /* ---------- top bar ---------- */
+        .topbar {
+            position: sticky; top: 0; z-index: 20;
+            display: flex; align-items: center; gap: 1rem;
+            padding: .7rem 1.25rem;
+            background: color-mix(in srgb, var(--background) 88%, transparent);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--edge);
+        }
+        .topbar-brand {
+            font-family: var(--font-heading); font-weight: 700; font-size: 1.05rem;
+            color: var(--text); text-decoration: none; margin-right: auto;
+        }
+        .topbar-links { display: none; gap: 1.5rem; }
+        .topbar-links a { color: var(--muted); text-decoration: none; font-size: .95rem; font-weight: 500; }
+        .topbar-links a:hover { color: var(--text); }
+        .topbar .button { margin: 0; padding: .55rem 1.1rem; font-size: .9rem; }
+
+        /* ---------- hero ---------- */
+        .hero { position: relative; padding: 0; background: var(--surface); }
+        .hero-photo { position: relative; }
+        .hero-photo img { width: 100%; height: clamp(15rem, 42vh, 26rem); object-fit: cover; }
+        /* A scrim rather than a flat tint: the headline has to stay legible over a photo we have
+           never seen, taken on a phone we do not control. */
+        .hero-photo::after {
+            content: ""; position: absolute; inset: 0;
+            background: linear-gradient(180deg, rgb(0 0 0 / .15) 0%, rgb(0 0 0 / .62) 100%);
+        }
+        .hero-body { padding: 2.5rem 1.25rem 3rem; }
+        .hero-photo + .hero-body {
+            position: absolute; inset: auto 0 0 0; padding: 1.5rem 1.25rem 1.75rem; color: #fff;
+        }
+        .hero-photo + .hero-body h1, .hero-photo + .hero-body .hero-sub { color: #fff; }
+        .hero-photo + .hero-body .eyebrow { background: rgb(255 255 255 / .18); color: #fff; }
+        .hero h1 { font-size: clamp(2rem, 7.5vw, 3.4rem); margin-bottom: .35em; }
+        .hero-sub { color: var(--muted); font-size: 1.075rem; max-width: 34rem; }
+        .eyebrow {
+            display: inline-block; margin-bottom: .9rem;
+            padding: .3rem .8rem; border-radius: 9999px;
+            background: color-mix(in srgb, var(--primary) 12%, transparent);
+            color: var(--primary);
+            font-size: .8rem; font-weight: 600; letter-spacing: .01em;
+        }
+        .hero-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 1.4rem; }
+
+        /* ---------- buttons ---------- */
+        .button {
+            display: inline-block; padding: .8rem 1.5rem; border-radius: 9999px;
+            background: var(--primary); color: #fff; text-decoration: none;
+            font-weight: 600; font-size: 1rem; line-height: 1.2;
+            box-shadow: var(--shadow); transition: transform .15s ease, filter .15s ease;
+        }
+        .button:hover { transform: translateY(-1px); filter: brightness(1.06); }
+        .button-ghost {
+            background: transparent; color: inherit;
+            border: 1.5px solid currentColor; box-shadow: none;
+        }
+
+        /* ---------- cards ---------- */
+        .grid { display: grid; gap: 1rem; grid-template-columns: 1fr; }
+        .card {
+            background: var(--background); border: 1px solid var(--edge);
+            border-radius: var(--radius); padding: 1.4rem;
+            box-shadow: var(--shadow);
+        }
+        .card h3 { margin-bottom: .35em; }
+        .card p { margin: 0; color: var(--muted); }
+        /* A short accent rule instead of an icon: nothing to invent, nothing to license. */
+        .card::before {
+            content: ""; display: block; width: 2rem; height: 3px; border-radius: 2px;
+            background: var(--accent); margin-bottom: .9rem;
+        }
+        .price { color: var(--text); font-weight: 600; margin-top: .6rem !important; }
+
+        .about-layout { display: grid; gap: 1.75rem; align-items: start; }
+        .about-layout img { border-radius: var(--radius); box-shadow: var(--shadow); }
+
+        .shots { display: grid; gap: .75rem; grid-template-columns: repeat(2, 1fr); }
+        .shots figure { margin: 0; }
+        .shots img { border-radius: .75rem; aspect-ratio: 4 / 3; object-fit: cover; width: 100%; }
+
+        blockquote {
+            margin: 0; padding: 1.5rem; background: var(--background);
+            border: 1px solid var(--edge); border-radius: var(--radius); box-shadow: var(--shadow);
+        }
+        blockquote p { font-size: 1.05rem; }
+        blockquote p::before { content: "“"; font-family: var(--font-heading); color: var(--accent); font-size: 1.6em; line-height: 0; vertical-align: -.25em; margin-right: .1em; }
+        blockquote cite { display: block; margin-top: .75rem; color: var(--muted); font-style: normal; font-weight: 600; }
+
+        /* ---------- shop ---------- */
+        .products { display: grid; gap: 1rem; grid-template-columns: repeat(2, 1fr); }
+        .product {
+            display: flex; flex-direction: column; text-decoration: none; color: inherit;
+            background: var(--background); border: 1px solid var(--edge);
+            border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow);
+            transition: transform .15s ease;
+        }
+        .product:hover { transform: translateY(-2px); }
+        .product img { width: 100%; aspect-ratio: 1 / 1; object-fit: cover; }
+        .product-body { display: flex; flex-direction: column; gap: .2rem; padding: .9rem 1rem 1.1rem; }
+        .product-name { font-weight: 600; line-height: 1.3; }
+        .product-price { font-family: var(--font-heading); font-weight: 700; }
+        .product-price.muted { font-family: var(--font-body); font-weight: 500; color: var(--muted); }
+        .shop-all { margin-top: 1.75rem; }
+        .muted-note { color: var(--muted); }
+
+        /* ---------- cart ---------- */
+        .lines { list-style: none; padding: 0; margin: 0 0 1.5rem; display: grid; gap: .75rem; }
+        .line {
+            display: grid; grid-template-columns: 4rem 1fr auto; gap: 1rem; align-items: center;
+            padding: .85rem; border: 1px solid var(--edge); border-radius: var(--radius);
+            background: var(--background);
+        }
+        .line img { width: 4rem; height: 4rem; object-fit: cover; border-radius: .5rem; }
+        .line-name { font-weight: 600; }
+        .line-meta { color: var(--muted); font-size: .9rem; }
+        .line form { margin: 0; }
+        .line button {
+            border: 0; background: none; color: var(--muted); cursor: pointer;
+            font: inherit; text-decoration: underline; padding: 0;
+        }
+        .totals {
+            display: flex; justify-content: space-between; align-items: baseline;
+            padding: 1rem 0; border-top: 2px solid var(--edge); margin-bottom: 1.5rem;
+        }
+        .totals strong { font-family: var(--font-heading); font-size: 1.4rem; }
+        .qty { display: inline-flex; align-items: center; gap: .5rem; }
+        .qty input {
+            width: 4rem; padding: .5rem; text-align: center;
+            border: 1px solid var(--edge); border-radius: .5rem; font: inherit;
+        }
+        .whatsapp-order {
+            display: inline-block; padding: .95rem 1.75rem; border-radius: 9999px;
+            background: #25D366; color: #0b3d20; font-weight: 700; text-decoration: none;
+            box-shadow: var(--shadow);
+        }
+        .crumbs { margin-bottom: 1.5rem; font-size: .95rem; }
+        .crumbs a { color: var(--muted); }
+
+        /* ---------- contact ---------- */
+        .contact-layout { display: grid; gap: 2rem; align-items: start; }
+        .contact-links { list-style: none; padding: 0; margin: 0 0 1.5rem; display: grid; gap: .6rem; }
+        .contact-links a {
+            display: flex; align-items: center; gap: .6rem;
+            padding: .85rem 1.1rem; border-radius: .75rem;
+            background: var(--background); border: 1px solid var(--edge);
+            color: var(--text); text-decoration: none; font-weight: 600;
+        }
+        .contact-links a:hover { border-color: var(--primary); }
+        .enquiry { display: grid; gap: .75rem; }
+        .enquiry input, .enquiry textarea {
+            width: 100%; padding: .85rem 1rem;
+            border: 1px solid var(--edge); border-radius: .75rem;
+            font: inherit; color: var(--text); background: var(--background);
+        }
+        .enquiry textarea { resize: vertical; }
+        .enquiry input:focus, .enquiry textarea:focus { outline: 2px solid var(--primary); outline-offset: 1px; }
+        .enquiry .button { border: 0; cursor: pointer; justify-self: start; }
+        .enquiry .hp { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+        .enquiry-error { color: #b42318; font-weight: 600; }
+        .enquiry-sent {
+            padding: 1.1rem 1.25rem; border-radius: var(--radius);
+            background: color-mix(in srgb, var(--primary) 12%, var(--background));
+            color: var(--text); font-weight: 600;
+        }
+
+        address { font-style: normal; font-size: 1.05rem; margin-bottom: 1rem; }
+        table { border-collapse: collapse; width: 100%; max-width: 26rem; }
+        td { padding: .4rem 0; border-bottom: 1px solid var(--edge); }
+        td + td { text-align: right; color: var(--muted); }
+        iframe { width: 100%; border: 0; aspect-ratio: 16 / 9; margin-top: 1.5rem; border-radius: var(--radius); }
+
+        /* ---------- closing prompt ---------- */
+        .closing { background: var(--primary); color: #fff; text-align: center; }
+        .closing h2 { color: #fff; }
+        .closing .button { background: #fff; color: var(--primary); }
+
+        /* ---------- footer ---------- */
+        .site-footer {
+            padding: 2.5rem 1.25rem; background: var(--text); color: #fff;
+            text-align: center; font-size: .9rem;
+        }
+        .site-footer strong { font-family: var(--font-heading); font-size: 1.1rem; display: block; margin-bottom: .4rem; }
+        .site-footer a { color: #fff; }
+        .site-footer p { color: rgb(255 255 255 / .72); margin: .35rem 0 0; }
+
+        /* ---------- the call bar ----------
+           Fixed to the bottom on phones. This audience calls and messages; making that one thumb
+           press from anywhere on the page is worth more than anything else on it. */
+        .callbar {
+            position: fixed; inset: auto 0 0 0; z-index: 30;
+            display: flex; gap: .5rem; padding: .6rem .75rem;
+            padding-bottom: calc(.6rem + env(safe-area-inset-bottom));
+            background: color-mix(in srgb, var(--background) 94%, transparent);
+            backdrop-filter: blur(10px);
+            border-top: 1px solid var(--edge);
+        }
+        .callbar a {
+            flex: 1; text-align: center; padding: .8rem .5rem; border-radius: .75rem;
+            text-decoration: none; font-weight: 700; font-size: .95rem;
+        }
+        .callbar .call { background: var(--primary); color: #fff; }
+        .callbar .whatsapp { background: #25D366; color: #0b3d20; }
+
+        @@media (prefers-reduced-motion: reduce) {
+            html { scroll-behavior: auto; }
+            .button { transition: none; }
+        }
+
+        /* Mobile first: widen only once there is room. */
+        @@media (min-width: 45rem) {
+            section { padding: 5rem 2rem; }
+            .topbar { padding: .8rem 2rem; }
+            .topbar-links { display: flex; }
+            .grid { grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); }
+            .shots { grid-template-columns: repeat(3, 1fr); }
+            .products { grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); }
+            .about-layout, .contact-layout { grid-template-columns: 1fr 1fr; gap: 3rem; }
+            .hero-photo img { height: clamp(20rem, 58vh, 34rem); }
+            .hero-photo + .hero-body { padding: 2.5rem 2rem 3rem; }
+            .hero-body { padding: 4rem 2rem 4.5rem; }
+            /* The call bar is a phone affordance; a desktop visitor has the top bar. */
+            .callbar { display: none; }
+            body.has-callbar { padding-bottom: 0; }
+        }
+    </style>

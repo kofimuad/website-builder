@@ -23,6 +23,7 @@ public class WebsiteBuilderDbContext : DbContext
     public DbSet<Site> Sites => Set<Site>();
     public DbSet<BusinessProfile> BusinessProfiles => Set<BusinessProfile>();
     public DbSet<Lead> Leads => Set<Lead>();
+    public DbSet<Product> Products => Set<Product>();
     public DbSet<Owner> Owners => Set<Owner>();
     public DbSet<SignInToken> SignInTokens => Set<SignInToken>();
 
@@ -130,6 +131,19 @@ public class WebsiteBuilderDbContext : DbContext
             e.HasOne<Tenant>().WithMany().HasForeignKey(p => p.TenantId).OnDelete(DeleteBehavior.Cascade);
         });
 
+        modelBuilder.Entity<Product>(e =>
+        {
+            e.HasKey(p => p.Id);
+            e.Property(p => p.Name).HasMaxLength(200).IsRequired();
+            e.Property(p => p.Slug).HasMaxLength(120).IsRequired();
+            e.Property(p => p.Description).HasMaxLength(4000);
+            e.Property(p => p.Currency).HasMaxLength(3).IsRequired();
+            // The slug is the product's public address, so it has to be unique per tenant — and
+            // only per tenant: two businesses may both sell "jollof".
+            e.HasIndex(p => new { p.TenantId, p.Slug }).IsUnique();
+            e.HasOne<Tenant>().WithMany().HasForeignKey(p => p.TenantId).OnDelete(DeleteBehavior.Cascade);
+        });
+
         modelBuilder.Entity<Lead>(e =>
         {
             e.HasKey(l => l.Id);
@@ -154,6 +168,9 @@ public class WebsiteBuilderDbContext : DbContext
 
         modelBuilder.Entity<Lead>()
             .HasQueryFilter(l => _tenantContext.TenantId != null && l.TenantId == _tenantContext.TenantId);
+
+        modelBuilder.Entity<Product>()
+            .HasQueryFilter(p => _tenantContext.TenantId != null && p.TenantId == _tenantContext.TenantId);
 
         base.OnModelCreating(modelBuilder);
     }

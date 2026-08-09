@@ -42,7 +42,7 @@ The onboarding **live preview** is the real generator run against the answers so
 static picture of a plumbing site until 2026-08-08, which meant it showed a mechanic invented
 guarantees and a headline about blocked drains.
 
-**Tests:** 386 total, all passing, and the suite makes no model API calls at all — see §11.
+**Tests:** 421 total, all passing, and the suite makes no model API calls at all — see §11.
 
 ---
 
@@ -109,9 +109,8 @@ ownership gate in `SiteManagementService.LoadAsync`, and the cross-tenant dashbo
 implicit routing middleware, the endpoint would already be selected before tenant resolution ran and
 the not-found rewrite would be ignored.
 
-On a tenant host, only `/` is served (rewritten to `/site`) plus paths with file extensions. Anything
-else 404s, so builder pages can never appear on a customer's domain. **This is the constraint
-ecommerce will have to change** — `/products/{slug}` and `/cart` need real routes there.
+On a tenant host, `/` is served (rewritten to `/site`), plus the shop allowlist and paths with file
+extensions. Anything else 404s, so builder pages can never appear on a customer's domain. See §8a.
 
 ### Reserved subdomains
 
@@ -156,7 +155,7 @@ Theme is separate from section content on purpose: restyling must never touch a 
 the generator writes the two independently.
 
 **Section types** (the discriminator strings are persisted data — renaming one is a migration):
-`hero`, `about`, `services`, `gallery`, `testimonials`, `contact`, `hoursMap`, `cta`.
+`hero`, `about`, `services`, `gallery`, `testimonials`, `contact`, `hoursMap`, `cta`, `shop`.
 
 `SectionCatalog` drives the editor's picker. A new section type appears in the UI by adding one
 entry there — no picker code changes.
@@ -338,6 +337,46 @@ notification bounces.
 
 ---
 
+## 8a. The shop
+
+Ecommerce v1: **catalog, cart, and the order sent on WhatsApp.** No payment integration — these
+sales already happen in chat, and a card form nobody in the market completes is worth less than a
+message the owner can reply to. Paystack (Stripe-owned, works in Ghana, handles MoMo) can slot in
+behind the same button later; Stripe itself cannot, see §12.
+
+**Products are relational rows, not part of the jsonb definition.** A draft that got published
+would overwrite whatever the catalog had become since; stock, when it arrives, is written by
+customers buying rather than by the owner editing; and an order needs a foreign key to point at. So
+a product is **live the moment it is saved** — there is no draft copy of a price, and the products
+page in the builder says so. The definition carries only a `shop` section marking where the catalog
+appears, which keeps the document a document.
+
+The slug is unique **per tenant**, not globally: two businesses may both sell jollof.
+
+### What a tenant host serves
+
+`TenantResolutionMiddleware` used to serve only `/`. It now serves an **allowlist** — `/shop`,
+`/products/{slug}`, `/cart` — and nothing else. An allowlist rather than a blocklist, and it stays
+one: a dashboard reachable at `joesplumbing.csbuild.app` is both a leak and a phishing surface.
+Adding a public page means adding it there deliberately.
+
+### The cart
+
+A cookie, holding product ids and quantities and **nothing else**. It is unsigned on purpose,
+because it carries no authority: every price, name and availability check is read from the database
+at render time, so the worst a forged cookie can do is put a product into its own owner's basket.
+Cookies are host-scoped by the browser, so one tenant's cart is unreadable on another's site.
+
+A line whose product has been deleted or withdrawn is dropped and the cookie rewritten. Quantities
+and line counts are clamped, so a hand-written cookie cannot make the cart page do unbounded work.
+
+`OrderMessage` composes the WhatsApp text. It totals the order **only when every priced line shares
+a currency** — a business selling in cedis and dollars gets no total rather than a wrong one, and
+the owner confirms. Unpriced products are a real way to sell here and list as "ask for a price".
+
+Shop pages are deliberately **not output-cached**: the cart is per-visitor and the catalog is live.
+The home page still is, because it is the same for everybody.
+
 ## 9. Images
 
 Cloudinary, with two decisions worth knowing:
@@ -493,7 +532,6 @@ more precisely than a live call could.
 | WB-9 Domains | Publish is done; unpublish/rollback and custom domains are not |
 | WB-3 | WB-45 category templates are built (§5); the on-a-phone design review is not done |
 
-**Ecommerce is under consideration and not started.** Two architectural findings already apply:
-products must be *relational* entities, not part of the jsonb site definition (stock is written by
-customers, not by the owner editing, and publishing a draft would clobber live inventory); and the
-tenant-host routing restriction in §3 must be relaxed first.
+**Ecommerce v1 is built** — catalog, cart and order-on-WhatsApp. See §8a. Not built: payments,
+stock levels, order records, delivery. An order exists only as a WhatsApp message; nothing about it
+is stored, which is the honest description of what this version does.

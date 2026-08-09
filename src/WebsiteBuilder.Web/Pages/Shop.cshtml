@@ -1,0 +1,57 @@
+@page "/shop"
+@using WebsiteBuilder.Core.SiteModel
+@model WebsiteBuilder.Web.Pages.ShopModel
+@{
+    Layout = null;
+    var chrome = Model.Chrome;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Shop &mdash; @chrome.BusinessName</title>
+@await Html.PartialAsync("_SiteStyles", chrome)
+</head>
+<body class="@(chrome.HasCallBar ? "has-callbar" : "")">
+@await Html.PartialAsync("_SiteTopBar", chrome)
+
+<section>
+    <div class="wrap">
+        <h2>Shop</h2>
+        @if (Model.Products.Count == 0)
+        {
+            <p class="muted-note">There is nothing in the shop just now. Please check back soon.</p>
+        }
+        else
+        {
+            <div class="products">
+                @foreach (var product in Model.Products)
+                {
+                    <a class="product" href="/products/@product.Slug">
+                        @if (!string.IsNullOrWhiteSpace(product.ImageUrl))
+                        {
+                            <img src="@ImageDelivery.Cropped(product.ImageUrl, 600, 600)"
+                                 alt="" width="600" height="600" loading="lazy" decoding="async" />
+                        }
+                        <span class="product-body">
+                            <span class="product-name">@product.Name</span>
+                            @if (product.DisplayPrice() is { } price)
+                            {
+                                <span class="product-price">@price</span>
+                            }
+                            else
+                            {
+                                <span class="product-price muted">Ask for a price</span>
+                            }
+                        </span>
+                    </a>
+                }
+            </div>
+        }
+    </div>
+</section>
+
+@await Html.PartialAsync("_SiteFooter", chrome)
+</body>
+</html>

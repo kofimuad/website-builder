@@ -20,6 +20,7 @@ using WebsiteBuilder.Web.Middleware;
 using WebsiteBuilder.Web.Onboarding;
 using WebsiteBuilder.Web.Platform;
 using WebsiteBuilder.Web.Publishing;
+using WebsiteBuilder.Web.Shop;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -112,6 +113,11 @@ else
 {
     builder.Services.AddScoped<IEmailSender, LogEmailSender>();
 }
+
+// The shop (WB ecommerce v1). Products are relational and live, so they are read per request
+// under the resolved tenant rather than snapshotted into the published document.
+builder.Services.AddScoped<ShopCatalog>();
+builder.Services.AddScoped<ProductsService>();
 
 // Photo uploads (WB-23). Cloudinary keeps the original and resizes on delivery, so the editor
 // stores a URL and each slot asks for the size it needs. Without credentials the editor offers no

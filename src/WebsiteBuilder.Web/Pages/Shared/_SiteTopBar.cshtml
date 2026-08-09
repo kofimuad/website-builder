@@ -1,0 +1,21 @@
+@using WebsiteBuilder.Web.Pages
+@model SiteChrome
+@*
+    The header every page of a tenant site carries — the home page and every shop page alike.
+
+    Nav targets are written as "/#services" rather than "#services" so the same link works from
+    /shop and /cart, where the anchor is on another page.
+*@
+<nav class="topbar">
+    <a class="topbar-brand" href="/">@Model.BusinessName</a>
+    <span class="topbar-links">
+        @foreach (var link in Model.NavLinks)
+        {
+            <a href="/#@link.Anchor">@link.Label</a>
+        }
+    </span>
+    @if (Model.Hero is { CallToActionLabel: { Length: > 0 } label, CallToActionUrl: { Length: > 0 } url })
+    {
+        <a class="button" href="@url">@label</a>
+    }
+</nav>

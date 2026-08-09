@@ -13,6 +13,17 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next, IOptions<Te
     public const string SiteNotFoundPath = "/site-not-found";
     public const string SitePath = "/site";
 
+    /// <summary>
+    /// The only paths a tenant host serves besides <c>/</c>.
+    /// <para>
+    /// An allowlist rather than a blocklist, and it stays one. The rule this enforces is that no
+    /// builder page can ever appear on a customer's own domain — a dashboard reachable at
+    /// joesplumbing.csbuild.app is both a leak and a phishing surface. Adding a public page to a
+    /// tenant site means adding it here deliberately, which is the point.
+    /// </para>
+    /// </summary>
+    private static readonly string[] PublicPaths = ["/shop", "/products", "/cart"];
+
     private readonly TenantResolutionOptions _options = options.Value;
 
     public async Task InvokeAsync(HttpContext context, TenantContext tenantContext, ITenantStore tenantStore)
@@ -45,14 +56,14 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next, IOptions<Te
 
                 tenantContext.TenantId = tenantId;
 
-                // A tenant host serves one thing: that tenant's published site. Requests for
-                // files (images, css) fall through to static assets; anything else would
-                // otherwise reach builder pages on a customer's domain.
+                // A tenant host serves that tenant's published site, its shop, and nothing else.
+                // Requests for files (images, fonts, css) fall through to static assets; anything
+                // outside the allowlist would otherwise reach builder pages on a customer's domain.
                 if (context.Request.Path == "/")
                 {
                     context.Request.Path = SitePath;
                 }
-                else if (!Path.HasExtension(context.Request.Path.Value))
+                else if (!IsPublic(context.Request.Path) && !Path.HasExtension(context.Request.Path.Value))
                 {
                     await RenderSiteNotFoundAsync(context);
                     return;
@@ -67,6 +78,13 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next, IOptions<Te
                 return;
         }
     }
+
+    /// <summary>
+    /// Matches on whole segments, so <c>/shop</c> and <c>/products/jollof</c> pass while
+    /// <c>/shop-admin</c> does not.
+    /// </summary>
+    private static bool IsPublic(PathString path) =>
+        PublicPaths.Any(p => path.StartsWithSegments(p, StringComparison.OrdinalIgnoreCase));
 
     private async Task RenderSiteNotFoundAsync(HttpContext context)
     {

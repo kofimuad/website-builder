@@ -1,0 +1,210 @@
+@page "/manage/{SiteId:guid}/products"
+@using WebsiteBuilder.Core.Entities
+@using WebsiteBuilder.Web.Auth
+@using WebsiteBuilder.Web.Images
+@using WebsiteBuilder.Web.Management
+@using WebsiteBuilder.Web.Shop
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject IServiceProvider Services
+@inject SiteManagementService Management
+@inject ProductsService ProductsService
+
+<PageTitle>Your products</PageTitle>
+
+<div class="products-page">
+    @if (_notFound)
+    {
+        <div class="empty-shell"><h1>We couldn't find that website</h1></div>
+    }
+    else if (_products is null)
+    {
+        <div class="empty-shell"><p>Loading…</p></div>
+    }
+    else
+    {
+        <header class="pp-top">
+            <a class="back" href="/manage/@SiteId/edit">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+                Back to editor
+            </a>
+            <a class="brand" href="/">@Branding.Name</a>
+        </header>
+
+        <div class="pp-body">
+            <div class="pp-head">
+                <div>
+                    <h1>Products</h1>
+                    <p>What you sell. Changes go live straight away &mdash; there is no separate publish for products.</p>
+                </div>
+                <button class="primary" @onclick="AddAsync" disabled="@_busy">Add an item</button>
+            </div>
+
+            @if (!_hasShopSection)
+            {
+                <p class="note">Your website has no shop section yet. Add <strong>Shop</strong> from the
+                    editor's section picker and these items appear on your site.</p>
+            }
+
+            @if (_products.Count == 0)
+            {
+                <div class="pp-card empty">
+                    <p>Nothing here yet. Add your first item and it appears on your website.</p>
+                </div>
+            }
+            else
+            {
+                @foreach (var product in _products)
+                {
+                    <div class="pp-card @(product.IsAvailable ? "" : "off")" @key="product.Id">
+                        <div class="pp-row">
+                            @if (_images is not null)
+                            {
+                                <ImageField Store="_images" TenantId="product.TenantId" AddLabel="Add a photo"
+                                            Url="product.ImageUrl"
+                                            UrlChanged="url => { product.ImageUrl = url; Touch(product); }" />
+                            }
+                            <div class="pp-fields">
+                                <input class="field name" @bind="product.Name" @bind:event="oninput"
+                                       @bind:after="() => Touch(product)" placeholder="What is it called?" />
+                                <textarea class="field" rows="2" @bind="product.Description" @bind:event="oninput"
+                                          @bind:after="() => Touch(product)" placeholder="A line or two about it"></textarea>
+                                <div class="pp-price">
+                                    <label>
+                                        Price
+                                        <input class="field" type="text" inputmode="decimal"
+                                               value="@PriceText(product)"
+                                               @onchange="e => SetPrice(product, e.Value?.ToString())"
+                                               placeholder="Leave blank for &quot;ask us&quot;" />
+                                    </label>
+                                    <label>
+                                        Currency
+                                        <input class="field short" @bind="product.Currency" @bind:event="oninput"
+                                               @bind:after="() => Touch(product)" maxlength="3" />
+                                    </label>
+                                    <label class="pp-toggle">
+                                        <input type="checkbox" checked="@product.IsAvailable"
+                                               @onchange="e => SetAvailable(product, (bool)(e.Value ?? false))" />
+                                        For sale
+                                    </label>
+                                </div>
+                                <p class="pp-address">Address on your site: <code>/products/@product.Slug</code></p>
+                            </div>
+                            <button class="drop" @onclick="() => DeleteAsync(product)" disabled="@_busy">Remove</button>
+                        </div>
+                    </div>
+                }
+
+                <p class="pp-status">@_status</p>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid SiteId { get; set; }
+
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private List<Product>? _products;
+    private IImageStore? _images;
+    private bool _notFound;
+    private bool _hasShopSection;
+    private bool _busy;
+    private string _status = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _images = Services.GetService<IImageStore>();
+
+        var ownerId = await AuthState.OwnerIdAsync();
+        var managed = await Management.LoadAsync(SiteId, ownerId);
+
+        // Loading through the management service is what puts this site's tenant in scope; every
+        // product query below relies on that, and on it having refused a site that is not theirs.
+        if (managed is null)
+        {
+            _notFound = true;
+            return;
+        }
+
+        _hasShopSection = managed.Site.Draft.Sections.Any(s => s is Core.SiteModel.ShopSection);
+        _products = await ProductsService.ListAsync();
+    }
+
+    private async Task AddAsync()
+    {
+        _busy = true;
+        try
+        {
+            var product = await ProductsService.AddAsync("New item");
+            _products!.Add(product);
+            _status = "Added.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task DeleteAsync(Product product)
+    {
+        _busy = true;
+        try
+        {
+            await ProductsService.DeleteAsync(product.Id);
+            _products!.Remove(product);
+            _status = "Removed.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>
+    /// Saves on every edit rather than behind a button. A product is live data, so there is no
+    /// draft for an unsaved change to sit in — and an owner who typed a price and walked away
+    /// should not come back to the old one.
+    /// </summary>
+    private async void Touch(Product product)
+    {
+        await ProductsService.SaveAsync(product);
+        _status = "Saved.";
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void SetAvailable(Product product, bool available)
+    {
+        product.IsAvailable = available;
+        Touch(product);
+    }
+
+    private static string PriceText(Product product) =>
+        product.PriceMinor is null ? "" : (product.PriceMinor.Value / 100m).ToString("0.00");
+
+    /// <summary>
+    /// Blank means "ask us", which is a real way to sell here. Anything unparseable is left alone
+    /// rather than silently becoming zero — a free product is not what a typo meant.
+    /// </summary>
+    private void SetPrice(Product product, string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            product.PriceMinor = null;
+            Touch(product);
+            return;
+        }
+
+        if (decimal.TryParse(text.Trim(), System.Globalization.NumberStyles.Number,
+                System.Globalization.CultureInfo.InvariantCulture, out var amount) && amount >= 0)
+        {
+            product.PriceMinor = (long)Math.Round(amount * 100, MidpointRounding.AwayFromZero);
+            Touch(product);
+        }
+        else
+        {
+            _status = "That price didn't look like a number, so it wasn't changed.";
+        }
+    }
+}

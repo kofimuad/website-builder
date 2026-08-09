@@ -1,0 +1,72 @@
+@page "/products/{slug}"
+@using WebsiteBuilder.Core.SiteModel
+@model WebsiteBuilder.Web.Pages.ProductPageModel
+@{
+    Layout = null;
+    var chrome = Model.Chrome;
+    var product = Model.Product;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@product.Name &mdash; @chrome.BusinessName</title>
+    @if (!string.IsNullOrWhiteSpace(product.Description))
+    {
+        <meta name="description" content="@product.Description" />
+    }
+@await Html.PartialAsync("_SiteStyles", chrome)
+</head>
+<body class="@(chrome.HasCallBar ? "has-callbar" : "")">
+@await Html.PartialAsync("_SiteTopBar", chrome)
+
+<section>
+    <div class="wrap">
+        <p class="crumbs"><a href="/shop">&larr; Back to the shop</a></p>
+
+        <div class="about-layout">
+            @if (!string.IsNullOrWhiteSpace(product.ImageUrl))
+            {
+                <img src="@ImageDelivery.Cropped(product.ImageUrl, 900, 900)"
+                     alt="" width="900" height="900" decoding="async" fetchpriority="high" />
+            }
+            <div>
+                <h2>@product.Name</h2>
+                @if (product.DisplayPrice() is { } price)
+                {
+                    <p class="product-price">@price</p>
+                }
+                else
+                {
+                    <p class="product-price muted">Ask for a price</p>
+                }
+
+                @foreach (var paragraph in product.Description.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                {
+                    <p>@paragraph</p>
+                }
+
+                @if (Model.JustAdded)
+                {
+                    <p class="enquiry-sent">Added to your order. @Model.CartCount item@(Model.CartCount == 1 ? "" : "s") so far.</p>
+                }
+
+                <form method="post" class="qty">
+                    <label for="quantity" class="line-meta">Quantity</label>
+                    <input id="quantity" name="quantity" type="number" value="1" min="1" max="99" inputmode="numeric" />
+                    <button class="button" type="submit">Add to order</button>
+                </form>
+
+                @if (Model.CartCount > 0)
+                {
+                    <p><a href="/cart">Review your order (@Model.CartCount)</a></p>
+                }
+            </div>
+        </div>
+    </div>
+</section>
+
+@await Html.PartialAsync("_SiteFooter", chrome)
+</body>
+</html>

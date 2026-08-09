@@ -48,7 +48,7 @@ below is the state before those keys were added; the remaining item is the desig
    outbound SMTP below the Pro plan** and drops the packets rather than refusing them. The app now
    sends over Resend's HTTPS API when `Email__ApiKey` is set. Untried against the real API.
 
-**Tests: 386 total, all passing, ~15s, and free.** `TenantAppFactory` blanks the model API key for
+**Tests: 421 total, all passing, ~15s, and free.** `TenantAppFactory` blanks the model API key for
 the test host. The old lone failure —
 `OnboardingProgressAndPreviewTests.Completing_onboarding_reports_the_real_stages_in_order` — was
 never a defect: with no credit Claude threw, the template fallback ran, and `WritingCopy` was
@@ -130,11 +130,10 @@ click-through. Remaining backlog, in the order last discussed:
    headings, and curated Unsplash stock photography. See `docs/PROJECT.md` §5. **One acceptance
    criterion is outstanding and needs Kofi**: "templates reviewed on real phone screens before
    shipping". Nothing has been committed or transitioned.
-2. **Ecommerce v1 — decided, not started.** Kofi chose **catalog + cart + "order on WhatsApp"** on
-   2026-08-09: no payment integration, no PCI surface, and it matches how these sales already
-   happen. Paystack follows once there is demand. The two architectural findings still hold —
-   products must be relational entities, and `TenantResolutionMiddleware` serves only `/` on a
-   tenant host, which `/products/{slug}` and `/cart` need relaxed first.
+2. ~~**Ecommerce v1.**~~ Built 2026-08-09: `Product` rows, a `shop` section, `/shop`,
+   `/products/{slug}` and `/cart` on tenant hosts, a cookie cart, an order composed into a WhatsApp
+   message, and a products page in the builder. See `docs/PROJECT.md` §8a. **Never exercised
+   against a real order** — no payment, no stored order, no stock.
 3. **WB-35** — SEO. Scoped from browser evidence: `LocalBusiness` JSON-LD first (nearly free, the
    data is already in `HoursMapSection` and `ContactSection`), then OG/Twitter tags with a
    Cloudinary-generated 1200×630 share image, then `robots.txt` + per-tenant `sitemap.xml`, then

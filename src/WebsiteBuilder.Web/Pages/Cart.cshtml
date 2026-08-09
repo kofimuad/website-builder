@@ -1,0 +1,102 @@
+@page "/cart"
+@using WebsiteBuilder.Core.SiteModel
+@using WebsiteBuilder.Web.Shop
+@model WebsiteBuilder.Web.Pages.CartModel
+@{
+    Layout = null;
+    var chrome = Model.Chrome;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Your order &mdash; @chrome.BusinessName</title>
+    <meta name="robots" content="noindex" />
+@await Html.PartialAsync("_SiteStyles", chrome)
+</head>
+<body class="@(chrome.HasCallBar ? "has-callbar" : "")">
+@await Html.PartialAsync("_SiteTopBar", chrome)
+
+<section>
+    <div class="wrap">
+        <p class="crumbs"><a href="/shop">&larr; Keep shopping</a></p>
+        <h2>Your order</h2>
+
+        @if (Model.Lines.Count == 0)
+        {
+            <p class="muted-note">Your order is empty.</p>
+            <p><a class="button" href="/shop">Go to the shop</a></p>
+        }
+        else
+        {
+            <ul class="lines">
+                @foreach (var line in Model.Lines)
+                {
+                    <li class="line">
+                        @if (!string.IsNullOrWhiteSpace(line.Product.ImageUrl))
+                        {
+                            <img src="@ImageDelivery.Cropped(line.Product.ImageUrl, 160, 160)"
+                                 alt="" width="160" height="160" loading="lazy" decoding="async" />
+                        }
+                        else
+                        {
+                            <span></span>
+                        }
+                        <span>
+                            <span class="line-name">@line.Product.Name</span>
+                            <span class="line-meta">
+                                @if (line.TotalMinor is { } lineTotal)
+                                {
+                                    @($"{line.Quantity} × {line.Product.DisplayPrice()} = {OrderMessage.FormatMoney(lineTotal, line.Product.Currency)}")
+                                }
+                                else
+                                {
+                                    @($"{line.Quantity} × price on request")
+                                }
+                            </span>
+                        </span>
+                        <form method="post">
+                            <input type="hidden" name="productId" value="@line.Product.Id" />
+                            <input type="hidden" name="quantity" value="0" />
+                            <button type="submit">Remove</button>
+                        </form>
+                    </li>
+                }
+            </ul>
+
+            <div class="totals">
+                <span>Total</span>
+                @if (Model.TotalMinor is { } total && Model.Currency is { } currency)
+                {
+                    <strong>@OrderMessage.FormatMoney(total, currency)</strong>
+                }
+                else
+                {
+                    @* Mixed currencies, or nothing priced. The owner confirms rather than us guessing. *@
+                    <strong class="line-meta">We'll confirm the total</strong>
+                }
+            </div>
+
+            @if (Model.OrderLink is { } orderLink)
+            {
+                <p><a class="whatsapp-order" href="@orderLink">Send this order on WhatsApp</a></p>
+                <p class="line-meta">This opens WhatsApp with your order already written. Nothing is
+                    paid here &mdash; @chrome.BusinessName will confirm and arrange payment with you.</p>
+            }
+            else
+            {
+                <p class="muted-note">This business has not added a WhatsApp number yet.
+                    @if (!string.IsNullOrWhiteSpace(chrome.Contact?.PhoneNumber))
+                    {
+                        <text>Call <a href="tel:@chrome.Contact.PhoneNumber">@chrome.Contact.PhoneNumber</a> to order.</text>
+                    }
+                </p>
+            }
+        }
+    </div>
+</section>
+
+@await Html.PartialAsync("_SiteFooter", chrome)
+</body>
+</html>

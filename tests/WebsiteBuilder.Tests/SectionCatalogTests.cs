@@ -22,12 +22,14 @@ public class SectionCatalogTests
     }
 
     [Fact]
-    public void Catalog_covers_all_eight_section_types()
+    public void The_picker_offers_every_section_type_the_renderer_knows()
     {
+        // The discriminators are persisted customer data, so this list changing is a schema
+        // decision rather than a tidy-up. See docs/site-schema.md.
         var kinds = SectionCatalog.Entries.Select(e => e.Kind).ToHashSet();
 
         Assert.Equal(
-            ["hero", "about", "services", "gallery", "testimonials", "contact", "hoursMap", "cta"],
+            ["hero", "about", "services", "gallery", "testimonials", "contact", "hoursMap", "cta", "shop"],
             kinds);
     }
 

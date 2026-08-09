@@ -154,6 +154,11 @@ public static class SitePlanBuilder
                 Email = profile.Email,
             },
 
+            // A generated site never starts with a shop: there is nothing in the catalog yet, and
+            // an empty grid saying "Shop" is worse than no shop. The owner adds it from the picker
+            // once they have something to sell.
+            "shop" => null,
+
             "cta" => new CtaSection
             {
                 Headline = copy.CtaHeadline,

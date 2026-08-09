@@ -9,5 +9,5 @@
 }
 else
 {
-    @await Html.PartialAsync("_RenderedSite", Model.Definition)
+    @await Html.PartialAsync("_RenderedSite", new WebsiteBuilder.Web.Pages.RenderedSiteView(Model.Definition, Model.Products))
 }

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
+using WebsiteBuilder.Core.Entities;
 using WebsiteBuilder.Core.SiteModel;
 using WebsiteBuilder.Data;
 using WebsiteBuilder.Web.Auth;
@@ -22,6 +23,9 @@ public class SitePreviewModel(WebsiteBuilderDbContext db) : PageModel
 {
     public SiteDefinition? Draft { get; private set; }
 
+    /// <summary>The tenant's live catalog, so a shop section previews with the real products in it.</summary>
+    public IReadOnlyList<Product> Products { get; private set; } = [];
+
     public async Task<IActionResult> OnGetAsync(Guid siteId)
     {
         var ownerId = User.OwnerId();
@@ -31,7 +35,7 @@ public class SitePreviewModel(WebsiteBuilderDbContext db) : PageModel
             return NotFound();
         }
 
-        Draft = await db.Sites
+        var found = await db.Sites
             .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(s => s.Id == siteId)
@@ -39,13 +43,30 @@ public class SitePreviewModel(WebsiteBuilderDbContext db) : PageModel
                 db.Tenants.Where(t => t.OwnerId == ownerId),
                 s => s.TenantId,
                 t => t.Id,
-                (s, _) => s.Draft)
+                (s, t) => new { s.Draft, TenantId = t.Id })
             .FirstOrDefaultAsync();
 
         // Not-yours and not-found are the same answer, so this cannot confirm a site id exists.
-        if (Draft is null)
+        if (found?.Draft is null)
         {
             return NotFound();
+        }
+
+        Draft = found.Draft;
+
+        var shop = Draft.Sections.OfType<ShopSection>().FirstOrDefault(s => s.Visible);
+        if (shop is not null)
+        {
+            // Filters are off on this page — it runs on the platform host, where no tenant is
+            // resolved — so the tenant is applied by hand, from the site we just authorised.
+            Products = await db.Products
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .Where(p => p.TenantId == found.TenantId && p.IsAvailable)
+                .OrderBy(p => p.SortOrder)
+                .ThenBy(p => p.Name)
+                .Take(shop.MaxItems)
+                .ToListAsync();
         }
 
         return Page();

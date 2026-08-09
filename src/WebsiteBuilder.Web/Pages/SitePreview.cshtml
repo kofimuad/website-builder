@@ -3,4 +3,4 @@
 @{
     Layout = null;
 }
-@await Html.PartialAsync("_RenderedSite", Model.Draft!)
+@await Html.PartialAsync("_RenderedSite", new WebsiteBuilder.Web.Pages.RenderedSiteView(Model.Draft!, Model.Products))

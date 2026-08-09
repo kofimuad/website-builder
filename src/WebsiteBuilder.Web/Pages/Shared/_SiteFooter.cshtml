@@ -1,0 +1,27 @@
+@using WebsiteBuilder.Web.Pages
+@model SiteChrome
+@* The footer and the phone call bar, on every page of a tenant site. *@
+<footer class="site-footer">
+    <strong>@Model.BusinessName</strong>
+    @if (!string.IsNullOrWhiteSpace(Model.Contact?.PhoneNumber))
+    {
+        <p><a href="tel:@Model.Contact.PhoneNumber">@Model.Contact.PhoneNumber</a></p>
+    }
+    <p>&copy; @DateTime.UtcNow.Year @Model.BusinessName</p>
+</footer>
+
+@if (Model.HasCallBar)
+{
+    @* Phone-only, and deliberately the last thing in the document: it is the one action most
+       visitors to these sites are here to take, and it should never be more than a thumb away. *@
+    <div class="callbar">
+        @if (!string.IsNullOrWhiteSpace(Model.Contact!.PhoneNumber))
+        {
+            <a class="call" href="tel:@Model.Contact.PhoneNumber">Call now</a>
+        }
+        @if (Model.WhatsAppLink is { } whatsapp)
+        {
+            <a class="whatsapp" href="@whatsapp">WhatsApp</a>
+        }
+    </div>
+}

@@ -1,6 +1,4 @@
-using System.Buffers;
-using System.Globalization;
-using System.Text;
+using WebsiteBuilder.Core.SiteModel;
 using WebsiteBuilder.Core.Tenancy;
 
 namespace WebsiteBuilder.Core.Onboarding;
@@ -11,8 +9,6 @@ public static class SubdomainSuggester
     private const int MaxLength = 40;
     private const string Fallback = "my-site";
 
-    private static readonly SearchValues<char> Apostrophes = SearchValues.Create("'’ʼ`´");
-
     /// <summary>
     /// Best-effort slug of a business name. Accents are folded to their base letter so "Café Ámà"
     /// becomes "cafe-ama"; a name with nothing ASCII left falls back rather than producing an
@@ -20,42 +16,7 @@ public static class SubdomainSuggester
     /// </summary>
     public static string Slugify(string? businessName)
     {
-        if (string.IsNullOrWhiteSpace(businessName))
-        {
-            return Fallback;
-        }
-
-        var decomposed = businessName.Normalize(NormalizationForm.FormD);
-        var builder = new StringBuilder(decomposed.Length);
-
-        foreach (var character in decomposed)
-        {
-            if (CharUnicodeInfo.GetUnicodeCategory(character) == UnicodeCategory.NonSpacingMark)
-            {
-                continue; // The accent, now separated from the letter it sat on.
-            }
-
-            if (Apostrophes.Contains(character))
-            {
-                continue; // "Joe's" should read joes, not joe-s.
-            }
-
-            if (char.IsAsciiLetterOrDigit(character))
-            {
-                builder.Append(char.ToLowerInvariant(character));
-            }
-            else if (builder.Length > 0 && builder[^1] != '-')
-            {
-                builder.Append('-');
-            }
-        }
-
-        var slug = builder.ToString().Trim('-');
-
-        if (slug.Length > MaxLength)
-        {
-            slug = slug[..MaxLength].TrimEnd('-');
-        }
+        var slug = Slug.From(businessName, MaxLength);
 
         // Anything this produces must survive SubdomainPolicy, or a name auto-assigned at
         // onboarding would be rejected at that same owner's first publish. One- and two-letter

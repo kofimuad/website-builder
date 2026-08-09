@@ -103,3 +103,22 @@ public sealed class CtaSection : SiteSection
     public string ButtonLabel { get; set; } = "";
     public string ButtonUrl { get; set; } = "";
 }
+
+/// <summary>
+/// Where the shop appears on the page. Deliberately holds no products.
+/// <para>
+/// Products are relational rows (see <c>Product</c>): they are live rather than draft, a customer's
+/// order has to point at one, and a publish must never overwrite a catalog that has moved on. This
+/// section is only the instruction "put the shop here", which keeps the definition a document.
+/// </para>
+/// </summary>
+public sealed class ShopSection : SiteSection
+{
+    public string Heading { get; set; } = "";
+
+    /// <summary>A line above the grid — delivery areas, order cut-off times, that sort of thing.</summary>
+    public string Intro { get; set; } = "";
+
+    /// <summary>How many products to show before linking to the full catalog.</summary>
+    public int MaxItems { get; set; } = 6;
+}

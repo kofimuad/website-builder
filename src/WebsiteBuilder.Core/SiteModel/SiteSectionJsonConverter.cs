@@ -30,6 +30,7 @@ public sealed class SiteSectionJsonConverter : JsonConverter<SiteSection>
         ["contact"] = typeof(ContactSection),
         ["hoursMap"] = typeof(HoursMapSection),
         ["cta"] = typeof(CtaSection),
+        ["shop"] = typeof(ShopSection),
     };
 
     private static readonly Dictionary<Type, string> DiscriminatorsByType =
