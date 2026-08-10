@@ -87,6 +87,18 @@
             position: relative; padding: 0; background: linear-gradient(140deg, var(--surface) 0%, color-mix(in srgb, var(--surface) 70%, var(--primary) 30%) 100%);
             overflow: hidden;
         }
+        .hero::before,
+        .hero::after {
+            content: ""; position: absolute; pointer-events: none; border-radius: 9999px; filter: blur(8px); opacity: .45;
+        }
+        .hero::before {
+            inset: auto -3.5rem -3.5rem auto; width: 15rem; height: 15rem;
+            background: radial-gradient(circle, color-mix(in srgb, var(--accent) 24%, transparent) 0%, transparent 72%);
+        }
+        .hero::after {
+            inset: -2rem auto auto -2.5rem; width: 12rem; height: 12rem;
+            background: radial-gradient(circle, color-mix(in srgb, var(--primary) 24%, transparent) 0%, transparent 72%);
+        }
         .hero-photo { position: relative; }
         .hero-photo img {
             width: 100%; height: clamp(15rem, 42vh, 26rem); object-fit: cover;
@@ -114,6 +126,16 @@
             text-shadow: 0 8px 24px rgb(0 0 0 / .24);
         }
         .hero-sub { color: var(--muted); font-size: 1.075rem; max-width: 34rem; }
+        .hero-highlights {
+            display: flex; flex-wrap: wrap; gap: .55rem; margin-top: 1rem;
+        }
+        .hero-highlights span {
+            display: inline-flex; align-items: center; gap: .35rem;
+            padding: .42rem .7rem; border-radius: 9999px;
+            background: rgb(255 255 255 / .16); color: #fff; border: 1px solid rgb(255 255 255 / .24);
+            font-size: .82rem; font-weight: 600; letter-spacing: .01em;
+            backdrop-filter: blur(6px);
+        }
         .eyebrow {
             display: inline-block; margin-bottom: .9rem;
             padding: .3rem .8rem; border-radius: 9999px;

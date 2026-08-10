@@ -115,6 +115,14 @@ JsonNamingPolicy.CamelCase
                             {
                                 <p class="hero-sub">@heroSection.Subheadline</p>
                             }
+                            <div class="hero-highlights">
+                                <span>Fast response</span>
+                                <span>Local support</span>
+                                @if (contactDetails is not null && !string.IsNullOrWhiteSpace(contactDetails.WhatsAppNumber))
+                                {
+                                    <span>WhatsApp ready</span>
+                                }
+                            </div>
                             <div class="hero-actions">
                                 @if (!string.IsNullOrWhiteSpace(heroSection.CallToActionLabel) &&
                         !string.IsNullOrWhiteSpace(heroSection.CallToActionUrl))
@@ -204,7 +212,7 @@ JsonNamingPolicy.CamelCase
                             {
                                 <blockquote>
                                     <p>@testimonial.Quote</p>
-                                    <cite>@testimonial.AuthorName@(string.IsNullOrWhiteSpace(testimonial.AuthorDetail) ? "" : $",                  {testimonial.AuthorDetail}")</cite>
+                                    <cite>@testimonial.AuthorName@(string.IsNullOrWhiteSpace(testimonial.AuthorDetail) ? "" : $",                     {testimonial.AuthorDetail}")</cite>
                                 </blockquote>
                             }
                         </div>
