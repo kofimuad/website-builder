@@ -1,6 +1,6 @@
 # Session handoff — CS Build
 
-Paste this into a new chat to continue where the last one stopped. Last updated 2026-08-09.
+Paste this into a new chat to continue where the last one stopped. Last updated 2026-08-10.
 
 > Read `docs/PROJECT.md` first — it describes the whole codebase. This file covers only what is
 > *live, decided, or pending* right now, and the things a fresh session would otherwise get wrong.
@@ -18,9 +18,16 @@ project **WB** on `csharpworks.atlassian.net` (cloudId `69108580-d8d9-4c90-a102-
 
 ## State as of this handoff
 
-`main` is at **`0236c55`**, committed and pushed. Kofi commits as work lands, so a clean working
+`main` is at **`fe153b9`**, committed and pushed. Kofi commits as work lands, so a clean working
 tree is the normal state — check `git log` rather than assuming, as an earlier version of this file
 claimed everything was unpushed long after it had been.
+
+**Added 2026-08-10 — the published-site template got its "wow factor" pass** (`1b19ba2`, `fe153b9`),
+which is the answer to the "generated sites look plain" note below: `_RenderedSite.cshtml` largely
+rewritten, `_SiteStyles.cshtml` given hero glow layers, and a row of hero highlight pills. **Two
+contrast bugs came in with it and are fixed in the working tree, uncommitted** — see the specificity
+entry under "Things a fresh session will get wrong". Both were invisible in the source and obvious
+on screen, which is the third time that has now happened.
 
 **Working in production:** apex + wildcard TLS on `csbuild.app`, tenant routing, onboarding →
 generate → edit → publish, the first-publish address picker and go-live moment, reserved
@@ -45,9 +52,10 @@ none of them is currently blocking anything.
   cost Kofi a round-trip to report. See `docs/PROJECT.md` → "Looking at the running app".
 
 **Still true and still worth doing:** the DataProtection keys are not persisted, so every deploy
-signs everyone out. Flagged several times, never authorised. And the generated sites look plain —
-that is a template problem (`_SiteStyles.cshtml`, `SiteChrome`, `CategoryTemplateCatalog`), not a
-model problem, because the model only writes copy and picks one of three palettes.
+signs everyone out. Flagged several times, never authorised. The "generated sites look plain" note
+has been acted on as of 2026-08-10 (above) — it was always a template problem
+(`_SiteStyles.cshtml`, `SiteChrome`, `CategoryTemplateCatalog`), not a model problem, because the
+model only writes copy and picks one of three palettes.
 
 **Three things were switched off, all for account reasons rather than code:**
 
@@ -66,7 +74,7 @@ model problem, because the model only writes copy and picks one of three palette
    outbound SMTP below the Pro plan** and drops the packets rather than refusing them. The app now
    sends over Resend's HTTPS API when `Email__ApiKey` is set. Untried against the real API.
 
-**Tests: 441 total, all passing, ~26s, and free.** `TenantAppFactory` blanks every provider's API
+**Tests: 442 total, all passing, ~17s, and free.** `TenantAppFactory` blanks every provider's API
 key for the test host. The old lone failure —
 `OnboardingProgressAndPreviewTests.Completing_onboarding_reports_the_real_stages_in_order` — was
 never a defect: with no credit Claude threw, the template fallback ran, and `WritingCopy` was
@@ -107,6 +115,22 @@ reported twice. It passes now because the host never takes the model path.
 - **`ui.pen` is encrypted.** It cannot be read or edited with normal file tools, only through the
   Pencil MCP with the file open in the editor — which only Kofi can do. It still says "Sitely" in
   nine places.
+- **`section:nth-of-type(even)` outranks any bare class in `_SiteStyles.cshtml`.** It is (0,1,1), so
+  `.closing` at (0,1,0) lost its own gradient and rendered a white heading on a near-white band —
+  but only when the CTA happened to land on an even section index, so moving a section appeared to
+  "fix" it. Fixed by excluding it: `section:nth-of-type(even):not(.closing)`. **Any future section
+  that paints a full-bleed background must be added to that `:not()`.**
+- **The published site has two heroes, and a style written for one breaks the other.** With a photo,
+  `.hero-photo + .hero-body` turns the text white over a dark scrim; without one, the hero is a pale
+  tint and white text vanishes. `.hero-highlights span` shipped unscoped and was invisible on every
+  photo-less site. When adding anything to the hero, style the default first and scope the white
+  variant to `.hero-photo + .hero-body`, as `.eyebrow` already does.
+- **`resize_page` will not go below ~500px** — the OS clamps the window, and the page silently
+  reports `innerWidth: 500` while you believe you are testing a 360px phone. Use
+  `emulate({viewport: "360x800x3,mobile,touch"})` for a real phone viewport.
+- **A full-page screenshot does not paint the map.** The `#find-us` iframe is `loading="lazy"`, so
+  it captures as a large blank band and looks like a layout bug. Scroll to it and take a viewport
+  screenshot before concluding anything is broken.
 - **A Blazor component parameter of type `string` takes an attribute value literally.**
   `Url="hero.ImageUrl"` passes the text `hero.ImageUrl`, not the property — so every image slot in
   the editor showed a broken thumbnail that no upload could replace, for weeks. It needs `@`.
@@ -173,7 +197,9 @@ click-through. Remaining backlog, in the order last discussed:
 1. ~~**WB-45** — category section templates.~~ Built: seven templates, category-aware lineups and
    headings, and curated Unsplash stock photography. See `docs/PROJECT.md` §5. **One acceptance
    criterion is outstanding and needs Kofi**: "templates reviewed on real phone screens before
-   shipping". Nothing has been committed or transitioned.
+   shipping". A 360×800 emulated pass on 2026-08-10 found no horizontal overflow and no clipped
+   content, but that is emulation, not a real handset, and it covered only the plumbing demo — not
+   the other six category templates. Nothing has been committed or transitioned.
 2. ~~**Ecommerce v1.**~~ Built 2026-08-09: `Product` rows, a `shop` section, `/shop`,
    `/products/{slug}` and `/cart` on tenant hosts, a cookie cart, an order composed into a WhatsApp
    message, and a products page in the builder. See `docs/PROJECT.md` §8a. **Never exercised

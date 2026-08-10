@@ -131,7 +131,7 @@
                         <h1>What do you offer?</h1>
                         <p class="hint">One per line. Three or four is plenty.</p>
                         <textarea class="field" rows="5" @bind="_offeringsText" @bind:event="oninput"
-                                  placeholder="Drain clearing&#10;Leak repair&#10;Bathroom fitting"></textarea>
+                                  placeholder="@("Drain clearing\nLeak repair\nBathroom fitting")"></textarea>
                         break;
 
                     case OnboardingStep.Tone:
@@ -203,7 +203,7 @@
                         <p class="hint">The area you cover, and your address if customers visit you.</p>
                         <label class="labelled">Area you cover<input class="field" @bind="_wizard.Answers.ServiceArea" @bind:event="oninput" placeholder="Osu and East Legon" /></label>
                         <label class="labelled">Address (optional)<textarea class="field" rows="3" @bind="_addressText" @bind:event="oninput"
-                                                           placeholder="12 High Street&#10;Osu, Accra"></textarea></label>
+                                                           placeholder="@("12 High Street\nOsu, Accra")"></textarea></label>
                         break;
                 }
 

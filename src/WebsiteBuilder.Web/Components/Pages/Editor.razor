@@ -299,7 +299,7 @@ else
                 {
                     <div class="ai-panel">
                         <input class="ai-input" @bind="_aiText" @bind:event="oninput"
-                               placeholder="Tell the assistant what to change — e.g. &quot;make this friendlier&quot;" disabled="@_aiBusy" />
+                               placeholder="@("Tell the assistant what to change — e.g. \"make this friendlier\"")" disabled="@_aiBusy" />
                         <div class="ai-actions">
                             <button type="button" @onclick="() => CloseAi()" disabled="@_aiBusy">Cancel</button>
                             <button type="button" class="go" @onclick="() => RunAi(index)" disabled="@_aiBusy">

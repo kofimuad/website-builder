@@ -59,7 +59,11 @@
             padding: 3.5rem 1.25rem;
             position: relative;
         }
-        section:nth-of-type(even) {
+        /* The alternating tint is decoration for ordinary content sections. Sections that paint
+           their own full-bleed background must be excluded by name: this selector is (0,1,1) and
+           beats a bare class, so `.closing` lost its gradient and rendered white-on-white whenever
+           it happened to land on an even index. */
+        section:nth-of-type(even):not(.closing) {
             background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 86%, white 14%) 0%, transparent 100%);
         }
         .wrap { max-width: 68rem; margin: 0 auto; }
@@ -129,11 +133,19 @@
         .hero-highlights {
             display: flex; flex-wrap: wrap; gap: .55rem; margin-top: 1rem;
         }
+        /* Two heroes, two grounds. Without a photo the hero is a pale tint, so the pills are drawn
+           in the primary colour like `.eyebrow`; the white-on-glass treatment below only applies
+           over the darkened photo scrim, where it is the readable one. */
         .hero-highlights span {
             display: inline-flex; align-items: center; gap: .35rem;
             padding: .42rem .7rem; border-radius: 9999px;
-            background: rgb(255 255 255 / .16); color: #fff; border: 1px solid rgb(255 255 255 / .24);
+            background: color-mix(in srgb, var(--primary) 10%, transparent);
+            color: color-mix(in srgb, var(--primary) 88%, var(--text) 12%);
+            border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent);
             font-size: .82rem; font-weight: 600; letter-spacing: .01em;
+        }
+        .hero-photo + .hero-body .hero-highlights span {
+            background: rgb(255 255 255 / .16); color: #fff; border-color: rgb(255 255 255 / .24);
             backdrop-filter: blur(6px);
         }
         .eyebrow {
