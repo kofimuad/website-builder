@@ -216,6 +216,53 @@ public class CategoryTemplateLibraryTests
     }
 
     [Fact]
+    public void The_fallback_template_carries_no_stock_photography()
+    {
+        // It used to open on a rack of clothes in a boutique. That is the most specific-looking
+        // image in the catalog and it was served to every business whose own words matched none of
+        // the six categories — which the catalog itself says will be often. A wrong photograph
+        // above the fold is worse than no photograph, so this one has none.
+        var fallback = CategoryTemplateCatalog.Fallback;
+
+        Assert.Null(fallback.HeroPhoto);
+        Assert.Null(fallback.AboutPhoto);
+        Assert.Empty(fallback.Gallery);
+    }
+
+    [Fact]
+    public void The_matched_categories_all_keep_their_hero_photo()
+    {
+        // The counterpart to the test above: dropping the fallback's photo must not quietly become
+        // dropping everyone's. A chop bar getting a plate of food has matched, and that is earned.
+        var matched = CategoryTemplateCatalog.Templates
+            .Where(t => t.Id != CategoryTemplateCatalog.Fallback.Id);
+
+        Assert.All(matched, template => Assert.NotNull(template.HeroPhoto));
+    }
+
+    [Fact]
+    public void An_unmatched_business_gets_a_hero_with_no_image_rather_than_a_wrong_one()
+    {
+        var sections = SitePlanBuilder.Build(
+            CategoryTemplateCatalog.Fallback, FullProfile(), Copy());
+
+        Assert.True(string.IsNullOrWhiteSpace(sections.OfType<HeroSection>().Single().ImageUrl));
+    }
+
+    [Fact]
+    public void An_uploaded_photo_still_fills_the_fallback_hero()
+    {
+        // Removing the stock photo must not remove the slot: the owner's own picture is exactly
+        // what is supposed to go there, and it already outranks stock everywhere else.
+        var profile = FullProfile();
+        profile.PhotoUrls = ["https://res.cloudinary.com/demo/image/upload/v1/mine.jpg"];
+
+        var sections = SitePlanBuilder.Build(CategoryTemplateCatalog.Fallback, profile, Copy());
+
+        Assert.Equal(profile.PhotoUrls[0], sections.OfType<HeroSection>().Single().ImageUrl);
+    }
+
+    [Fact]
     public void No_lineup_asks_for_reviews_because_quotes_cannot_be_pre_filled()
     {
         var lineups = CategoryTemplateCatalog.Templates.SelectMany(t => t.Lineup);

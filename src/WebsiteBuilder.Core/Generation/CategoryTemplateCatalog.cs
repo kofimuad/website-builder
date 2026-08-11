@@ -200,8 +200,17 @@ public static class CategoryTemplateCatalog
         ]);
 
     /// <summary>
-    /// The page every site got before categories existed, plus a hero photo. Used whenever the
-    /// owner's own words don't match anything — which will be often, and must still look finished.
+    /// The page every site got before categories existed. Used whenever the owner's own words
+    /// don't match anything — which will be often, and must still look finished.
+    /// <para>
+    /// Deliberately carries <b>no photography</b>, unlike every other template. The other six earn
+    /// their pictures by having matched: food for a chop bar, a chair for a salon. This one is the
+    /// fallback precisely because we do not know what the business is, and the stock photo it used
+    /// to carry — a rack of clothes in a boutique — was the single most specific-looking image in
+    /// the catalog. It was shown to the widest range of businesses and matched almost none of them.
+    /// An empty hero is honest; a wrong one is worse than nothing. The owner's own photo still
+    /// wins here as everywhere, so uploading one fills the slot immediately.
+    /// </para>
     /// </summary>
     private static readonly CategoryTemplate General = new(
         Id: "general",
@@ -216,9 +225,7 @@ public static class CategoryTemplateCatalog
             new("hoursMap", "Find us"),
             new("contact", "Get in touch"),
             new("cta", ""),
-        ],
-        HeroPhoto: new("photo-1441986300917-64674bd600d8", "Clothes and shelves in a small shop"),
-        AboutPhoto: new("photo-1556742049-0cfed4f6a45d", "A customer paying at a shop counter"));
+        ]);
 
     public static IReadOnlyList<CategoryTemplate> Templates { get; } =
         [Restaurant, Salon, Trades, Consultant, Church, Events, General];

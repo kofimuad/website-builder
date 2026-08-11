@@ -1,6 +1,6 @@
 # Session handoff — CS Build
 
-Paste this into a new chat to continue where the last one stopped. Last updated 2026-08-10.
+Paste this into a new chat to continue where the last one stopped. Last updated 2026-08-11.
 
 > Read `docs/PROJECT.md` first — it describes the whole codebase. This file covers only what is
 > *live, decided, or pending* right now, and the things a fresh session would otherwise get wrong.
@@ -18,16 +18,20 @@ project **WB** on `csharpworks.atlassian.net` (cloudId `69108580-d8d9-4c90-a102-
 
 ## State as of this handoff
 
-`main` is at **`fe153b9`**, committed and pushed. Kofi commits as work lands, so a clean working
+`main` is at **`4a5326e`**, committed and pushed. Kofi commits as work lands, so a clean working
 tree is the normal state — check `git log` rather than assuming, as an earlier version of this file
 claimed everything was unpushed long after it had been.
 
 **Added 2026-08-10 — the published-site template got its "wow factor" pass** (`1b19ba2`, `fe153b9`),
 which is the answer to the "generated sites look plain" note below: `_RenderedSite.cshtml` largely
-rewritten, `_SiteStyles.cshtml` given hero glow layers, and a row of hero highlight pills. **Two
-contrast bugs came in with it and are fixed in the working tree, uncommitted** — see the specificity
-entry under "Things a fresh session will get wrong". Both were invisible in the source and obvious
-on screen, which is the third time that has now happened.
+rewritten, `_SiteStyles.cshtml` given hero glow layers, and a row of hero highlight pills. Two
+contrast bugs came in with it and were fixed in `4a5326e`, along with the Razor attribute-entity
+fixes. All three were invisible in the source and obvious on screen.
+
+**Uncommitted in the working tree as of 2026-08-11**, all verified in the browser and under test:
+the Products page button/grid fixes, the `general` template losing its stock photography, the
+onboarding preview moving onto the real renderer, and the hero grid-overlay fix that the new
+preview immediately exposed.
 
 **Working in production:** apex + wildcard TLS on `csbuild.app`, tenant routing, onboarding →
 generate → edit → publish, the first-publish address picker and go-live moment, reserved
@@ -74,7 +78,7 @@ model only writes copy and picks one of three palettes.
    outbound SMTP below the Pro plan** and drops the packets rather than refusing them. The app now
    sends over Resend's HTTPS API when `Email__ApiKey` is set. Untried against the real API.
 
-**Tests: 442 total, all passing, ~17s, and free.** `TenantAppFactory` blanks every provider's API
+**Tests: 455 total, all passing, ~17s, and free.** `TenantAppFactory` blanks every provider's API
 key for the test host. The old lone failure —
 `OnboardingProgressAndPreviewTests.Completing_onboarding_reports_the_real_stages_in_order` — was
 never a defect: with no credit Claude threw, the template fallback ran, and `WritingCopy` was
@@ -115,6 +119,24 @@ reported twice. It passes now because the host never takes the model path.
 - **`ui.pen` is encrypted.** It cannot be read or edited with normal file tools, only through the
   Pencil MCP with the file open in the editor — which only Kofi can do. It still says "Sitely" in
   nine places.
+- **The onboarding preview is the real renderer now, in an iframe** — see `docs/PROJECT.md`. Two
+  consequences: a change to `_RenderedSite`/`_SiteStyles` shows up in onboarding for free, and a
+  bug there is now visible during onboarding too. `/start/preview/{token}` is **anonymous by
+  necessity** (onboarding precedes sign-in); the 16-byte token is the only guard and that is
+  deliberate. Don't "fix" it by adding `[Authorize]` — that breaks the whole wizard.
+- **The `general` fallback template deliberately has no photography.** It used to open on a rack of
+  clothes in a boutique, which was served to every business matching none of the six categories —
+  the widest audience getting the most specific-looking picture. The other six keep theirs.
+  `CategoryTemplateLibraryTests` pins both halves, so adding a photo back trips a test.
+- **A `.hero-body` over a photo is a grid overlay, not absolute positioning.** It used to be
+  `position: absolute; inset: auto 0 0 0`, pinned to the photo's bottom with no height of its own,
+  so a hero taller than its picture grew *upward* out of the header and slid under the sticky top
+  bar — a two-line headline at ~540px wide reproduces it. `.hero-has-photo` puts photo and body in
+  one grid cell instead. The markup class exists rather than `:has()` on purpose: this HTML goes to
+  whatever browser a customer in Accra is holding.
+- **Chrome for `chrome-devtools-mcp` wedges on a bad saved window state**, failing every call with
+  `Browser.setContentsSize: Restore window to normal state`. Killing the process is not enough —
+  delete `~/.cache/chrome-devtools-mcp/chrome-profile/Default/Preferences` and let it recreate.
 - **`section:nth-of-type(even)` outranks any bare class in `_SiteStyles.cshtml`.** It is (0,1,1), so
   `.closing` at (0,1,0) lost its own gradient and rendered a white heading on a near-white band —
   but only when the CTA happened to land on an even section index, so moving a section appeared to

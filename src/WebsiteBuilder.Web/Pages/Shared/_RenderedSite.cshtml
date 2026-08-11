@@ -94,7 +94,10 @@ JsonNamingPolicy.CamelCase
         switch (section)
         {
             case HeroSection heroSection:
-                <header class="hero" id="top">
+                @* The modifier drives a grid overlay in the stylesheet. A `:has()` selector would
+                   read better but this markup is served to whatever browser a customer in Accra is
+                   holding, and a class costs nothing. *@
+                <header class="hero @(string.IsNullOrWhiteSpace(heroSection.ImageUrl) ? "" : "hero-has-photo")" id="top">
                     @if (!string.IsNullOrWhiteSpace(heroSection.ImageUrl))
                     {
                         <div class="hero-photo">

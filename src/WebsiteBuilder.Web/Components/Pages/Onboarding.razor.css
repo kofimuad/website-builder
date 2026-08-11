@@ -193,25 +193,16 @@ textarea.field { resize: vertical; line-height: 1.5; }
 }
 .addr svg { font-size: 11px; color: var(--fg-muted); }
 
-.mini-page { flex: 1; display: flex; flex-direction: column; background: #fff; }
-.mini-nav { display: flex; align-items: center; justify-content: space-between; padding: 16px 22px; }
-.mini-brand { font-family: var(--font-head); font-size: 15px; font-weight: 600; color: var(--fg); }
-.mini-links { display: inline-flex; gap: 16px; }
-.mini-links span { font-size: 12px; color: var(--fg2); }
-.mini-call { padding: 7px 13px; border-radius: 9999px; background: var(--accent); color: #fff; font-size: 12px; font-weight: 600; }
-.mini-hero { display: flex; flex-direction: column; gap: 16px; padding: 40px 22px 44px; background: var(--tile2); }
-.mini-eyebrow { align-self: flex-start; padding: 6px 12px; border-radius: 9999px; background: var(--tile); color: var(--accent-strong); font-size: 11px; font-weight: 600; }
-.mini-head { font-family: var(--font-head); font-size: 30px; font-weight: 600; line-height: 1.1; color: var(--fg); max-width: 440px; }
-.mini-sub { font-size: 14px; line-height: 1.5; color: var(--fg2); max-width: 420px; }
-.mini-cta { display: flex; gap: 10px; margin-top: 6px; }
-.mini-primary { padding: 11px 20px; border-radius: 9999px; background: var(--accent); color: #fff; font-size: 13px; font-weight: 600; }
-.mini-secondary { padding: 11px 20px; border-radius: 9999px; border: 1px solid var(--line); color: var(--fg); font-size: 13px; font-weight: 600; }
-/* The category's stock photograph, at the shape the real hero band uses. Cropped by the CDN, so
-   the preview is showing the same file the built site will serve. */
-.mini-shot { display: block; width: 100%; height: 150px; object-fit: cover; }
-.mini-strip { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; padding: 18px 22px; }
-.mini-feat { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--fg2); }
-.mini-feat svg { font-size: 15px; color: var(--accent); }
+/* The real site, in a real viewport. No transform: scaling a document blurs its text and lies
+   about how big things are, and the frame is wide enough that the site's own responsive rules do
+   the right thing on their own. */
+.site-frame {
+    flex: 1;
+    width: 100%;
+    border: 0;
+    display: block;
+    background: #fff;
+}
 
 /* ---------- centered states (building / done) ---------- */
 .onb-center { flex: 1; display: flex; align-items: center; justify-content: center; padding: 40px; }

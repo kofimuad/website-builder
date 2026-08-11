@@ -1,0 +1,36 @@
+@page "/start/preview/{token}"
+@model WebsiteBuilder.Web.Pages.OnboardingPreviewModel
+@{
+    Layout = null;
+}
+@* The whole point of this page: the onboarding preview goes through the same partial and the same
+   stylesheet as a published site, so the two cannot drift. Anything added to _RenderedSite shows
+   up here for free. *@
+@if (Model.Definition is null)
+{
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Preview</title>
+        <style>
+            body {
+                margin: 0; min-height: 100vh; display: grid; place-items: center;
+                font-family: system-ui, sans-serif; color: #47624F; background: #F6F5F1;
+                text-align: center; padding: 24px; line-height: 1.6;
+            }
+        </style>
+    </head>
+    <body>
+        <p>This preview has expired.<br />Carry on answering and it will come back.</p>
+    </body>
+    </html>
+}
+else
+{
+    @* Home is this page, so the site's own nav anchors stay inside the frame instead of sending
+       the visitor out of onboarding and onto the marketing site. *@
+    @await Html.PartialAsync("_RenderedSite",
+        new WebsiteBuilder.Web.Pages.RenderedSiteView(Model.Definition, [], $"/start/preview/{Model.Token}"))
+}

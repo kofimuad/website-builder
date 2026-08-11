@@ -67,6 +67,7 @@ builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection(EmailO
 builder.Services.AddScoped<PlatformUrls>();
 builder.Services.AddScoped<OwnerSignInService>();
 builder.Services.AddScoped<OnboardingDraftStore>();
+builder.Services.AddScoped<OnboardingPreviewStore>();
 
 // No provider configured means a developer can still sign in: the link goes to the log.
 var emailOptions = builder.Configuration.GetSection(EmailOptions.SectionName).Get<EmailOptions>() ?? new EmailOptions();

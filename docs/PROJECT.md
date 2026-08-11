@@ -38,14 +38,31 @@ Stripe.
 **Not built at all:** billing, admin tooling, SEO metadata, custom domains, rollback, analytics.
 
 The onboarding **live preview** is the real generator run against the answers so far — the same
-`TemplateSiteGenerator` that builds the site, projected into a small browser mock-up. **It never
-calls the model**: it rebuilds on every keystroke, so it shows structure, imagery and layout rather
-than final copy. A preview that reads generically is therefore not evidence the model is broken —
-the startup banner and any `AI GENERATION FAILED` line in the log are. It was a
-static picture of a plumbing site until 2026-08-08, which meant it showed a mechanic invented
-guarantees and a headline about blocked drains.
+`TemplateSiteGenerator` that builds the site — rendered by the **real site renderer** in an iframe.
+**It never calls the model**: it rebuilds as you type, so it shows structure, imagery and layout
+rather than final copy. A preview that reads generically is therefore not evidence the model is
+broken — the startup banner and any `AI GENERATION FAILED` line in the log are. It was a static
+picture of a plumbing site until 2026-08-08, which meant it showed a mechanic invented guarantees
+and a headline about blocked drains.
 
-**Tests:** 437 total, all passing, and the suite makes no model API calls at all — see §11.
+Until 2026-08-11 it was a hand-drawn `.mini-*` imitation of a site — a second implementation of the
+renderer that drifted every time the real one changed, and by the end had none of the hero glow,
+highlight pills or section striping the published page had grown. It is now an `<iframe>` onto
+`/start/preview/{token}` (`OnboardingPreview.cshtml`), which renders `_RenderedSite` through
+`_SiteStyles` exactly as a published site does, so the two cannot diverge. The mechanics:
+
+- **`OnboardingPreviewStore`** holds the answers in memory under a 16-byte random token. It is the
+  sibling of `OnboardingDraftStore` with one deliberate difference — a preview is **read
+  repeatedly**, a stashed interview is redeemed once.
+- **The page is anonymous**, because onboarding happens before sign-in and there is no identity to
+  authorise against. The token is the guard, and it holds only what the visitor is typing.
+- **Edits settle for 650ms** before the frame reloads, so it neither flickers nor renders half-typed
+  words. `Onboarding.razor` compares a signature of the answers to avoid reloading on a keypress
+  that changed nothing.
+- **Nothing is scaled.** The frame is a real viewport, so the site's own media queries apply and the
+  type stays crisp — which is also why this immediately exposed a real hero bug at narrow widths.
+
+**Tests:** 455 total, all passing, and the suite makes no model API calls at all — see §11.
 
 ---
 

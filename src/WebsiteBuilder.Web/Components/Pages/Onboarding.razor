@@ -14,8 +14,10 @@
 @inject IServiceProvider Services
 @inject OnboardingService OnboardingService
 @inject OnboardingDraftStore DraftStore
+@inject OnboardingPreviewStore PreviewStore
 @inject SiteManagementService Management
 @inject NavigationManager Navigation
+@implements IDisposable
 
 <PageTitle>Let's build your website</PageTitle>
 
@@ -232,12 +234,9 @@
             </div>
 
             @{
-                // The preview is the real generator run against the answers so far, not a mock:
-                // whatever it shows is what pressing "Build my website" would produce, give or take
-                // the model's wording. Rebuilt each render — it is pure string work, no I/O.
+                // Only the address bar needs anything from the answers now. The page itself is
+                // rendered by the site renderer, inside the frame below.
                 var profile = PreviewProfile;
-                var preview = PreviewSiteFor(profile);
-                var previewHero = preview.Sections.OfType<HeroSection>().FirstOrDefault();
             }
             <aside class="preview-panel">
                 <div class="preview-head">
@@ -255,45 +254,17 @@
                             @SubdomainSuggester.Slugify(profile.BusinessName).@PlatformSuffix
                         </span>
                     </div>
-                    <div class="mini-page" style="--accent:@preview.Theme.Palette.Primary">
-                        <div class="mini-nav">
-                            <span class="mini-brand">@preview.Meta.BusinessName</span>
-                            <span class="mini-links">
-                                @foreach (var link in PreviewNavLinks(preview))
-                                {
-                                    <span>@link</span>
-                                }
-                            </span>
-                            <span class="mini-call">@ContactActions.DefaultLabel(profile.PrimaryAction)</span>
-                        </div>
-                        <div class="mini-hero">
-                            @if (!string.IsNullOrWhiteSpace(preview.Meta.Tagline))
-                            {
-                                <span class="mini-eyebrow">@preview.Meta.Tagline</span>
-                            }
-                            <div class="mini-head">@previewHero?.Headline</div>
-                            <div class="mini-sub">@previewHero?.Subheadline</div>
-                            <div class="mini-cta">
-                                <span class="mini-primary">@previewHero?.CallToActionLabel</span>
-                                @if (!string.IsNullOrWhiteSpace(profile.WhatsAppNumber))
-                                {
-                                    <span class="mini-secondary">WhatsApp us</span>
-                                }
-                            </div>
-                        </div>
-                        @if (!string.IsNullOrWhiteSpace(previewHero?.ImageUrl))
-                        {
-                            <img class="mini-shot" src="@previewHero.ImageUrl" alt="" />
-                        }
-                        <div class="mini-strip">
-                            @foreach (var offering in profile.Offerings.Take(3))
-                            {
-                                <span class="mini-feat">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>@offering
-                                </span>
-                            }
-                        </div>
-                    </div>
+                    @* The site itself, rendered by _RenderedSite through _SiteStyles — the same two
+                       files that draw the published page. This used to be a hand-drawn ".mini-"
+                       imitation, which meant every change to the real renderer silently made the
+                       preview a lie. It cannot drift now, because there is only one renderer.
+
+                       Nothing is scaled: the frame is a real viewport, so the site lays itself out
+                       with its own media queries at whatever width the panel gives it, and the
+                       type stays crisp. sandbox keeps the framed document from navigating the
+                       wizard away underneath the visitor. *@
+                    <iframe class="site-frame" title="A live preview of your website"
+                            src="@PreviewSrc" sandbox="allow-same-origin"></iframe>
                 </div>
             </aside>
         </div>
@@ -417,7 +388,83 @@
     // guess our wording.
     private static IReadOnlyList<string> CategorySuggestions => CategoryTemplateCatalog.Examples;
 
-    private static readonly TemplateSiteGenerator PreviewGenerator = new();
+    // ---- live preview ----------------------------------------------------------------------
+    //
+    // The frame is a real page on a real request, so the answers have to reach it out of band:
+    // the circuit writes them to the preview store, the page reads them back. The version in the
+    // query string is what makes the frame reload — the path is stable, only the content changes.
+
+    private readonly string _previewToken = OnboardingPreviewStore.NewToken();
+    private int _previewVersion;
+    private string _previewSignature = "";
+    private CancellationTokenSource? _previewDebounce;
+
+    private string PreviewSrc => $"/start/preview/{_previewToken}?v={_previewVersion}";
+
+    /// <summary>
+    /// Reloading a whole document on every keystroke would flicker and would render text nobody
+    /// has finished typing, so edits settle first. Long enough to cover typing a business name,
+    /// short enough that it still feels like it is keeping up.
+    /// </summary>
+    private static readonly TimeSpan PreviewSettleDelay = TimeSpan.FromMilliseconds(650);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        var profile = PreviewProfile;
+        var signature = PreviewSignature(profile);
+
+        if (signature == _previewSignature)
+        {
+            return;
+        }
+
+        _previewSignature = signature;
+
+        // The first paint must not wait: the frame is already asking for this token, and an empty
+        // store answers "expired". Later edits settle.
+        if (!firstRender)
+        {
+            _previewDebounce?.Cancel();
+            _previewDebounce?.Dispose();
+
+            var settling = new CancellationTokenSource();
+            _previewDebounce = settling;
+
+            try
+            {
+                await Task.Delay(PreviewSettleDelay, settling.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                // A newer keystroke owns the preview now.
+                return;
+            }
+        }
+
+        PreviewStore.Put(_previewToken, profile);
+        _previewVersion++;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>
+    /// Everything the rendered page can show. Comparing this rather than re-generating means an
+    /// arrow key or a focus change does not cost a reload.
+    /// </summary>
+    private static string PreviewSignature(BusinessProfile profile) => string.Join(
+        '␟',
+        profile.BusinessName, profile.Category, profile.Tone, profile.PrimaryAction,
+        profile.PhoneNumber, profile.WhatsAppNumber, profile.Email, profile.ServiceArea,
+        string.Join('␞', profile.Offerings),
+        string.Join('␞', profile.AddressLines),
+        string.Join('␞', profile.PhotoUrls));
+
+    public void Dispose()
+    {
+        _previewDebounce?.Cancel();
+        _previewDebounce?.Dispose();
+        PreviewStore.Forget(_previewToken);
+    }
+
 
     /// <summary>
     /// The answers so far, with an example standing in for anything not yet given. The example is
@@ -450,29 +497,6 @@
             };
         }
     }
-
-    private static SiteDefinition PreviewSiteFor(BusinessProfile profile) => PreviewGenerator.Generate(profile);
-
-    /// <summary>
-    /// The headings of the sections the site will actually have, which is how the owner sees that
-    /// a restaurant gets a menu and a plumber gets services.
-    /// </summary>
-    private static IEnumerable<string> PreviewNavLinks(SiteDefinition site) => site.Sections
-        .Select(section => section switch
-        {
-            ServicesSection services => services.Heading,
-            // "About Joe's Plumbing" is the right heading on the page and far too long in a nav
-            // bar, where every other item is two words.
-            AboutSection about => about.Heading.Contains(site.Meta.BusinessName, StringComparison.OrdinalIgnoreCase)
-                ? "About"
-                : about.Heading,
-            GallerySection gallery => gallery.Heading,
-            ContactSection contact => contact.Heading,
-            _ => null,
-        })
-        .OfType<string>()
-        .Where(heading => !string.IsNullOrWhiteSpace(heading))
-        .Take(3);
 
     private static string Or(string? value, string fallback) =>
         string.IsNullOrWhiteSpace(value) ? fallback : value;
