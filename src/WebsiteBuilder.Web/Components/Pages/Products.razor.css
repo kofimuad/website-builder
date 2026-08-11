@@ -24,6 +24,9 @@
     margin: 0; padding: 14px 16px; border-radius: 12px;
     background: #FFF6E5; border: 1px solid #F0DCB4; color: #6B4E16; font-size: 14px;
 }
+/* Inherits the note's brown rather than the page accent — green on this amber ground is muddy. */
+.note a { color: inherit; font-weight: 600; text-underline-offset: 2px; }
+.note a:hover { color: #4A350D; }
 
 .pp-card { padding: 18px; border-radius: 16px; background: #fff; border: 1px solid #E7E9E1; }
 /* An item that is not for sale still has to be findable and editable, just visibly off. */
@@ -34,9 +37,17 @@
    top of the name field. min-width:0 on the middle column is what lets the inputs shrink instead
    of pushing it there. */
 .pp-row { display: grid; grid-template-columns: 140px minmax(0, 1fr) min-content; gap: 18px; align-items: start; }
+.pp-row.no-photo { grid-template-columns: minmax(0, 1fr) min-content; }
+/* Never let the delete control stretch to fill its track — it is a button, not a bar. */
+.pp-row > .drop, .pp-row > .pp-confirm { justify-self: start; }
 .pp-fields { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 
+/* There is no global box-sizing reset — Editor, Onboarding and SignIn each add border-box to their
+   own field class and this page never did. Without it width:100% means 100% *plus* 24px of padding
+   and 2px of border, so every input overflowed its grid column by 26px and sat under the delete
+   button. */
 .field {
+    box-sizing: border-box;
     width: 100%; padding: 10px 12px; border-radius: 10px;
     border: 1px solid #D6DECB; background: #fff;
     font-family: var(--font-body); font-size: 15px; color: var(--fg);
@@ -52,11 +63,31 @@
 .pp-address { margin: 0; font-size: 13px; color: var(--fg-muted); }
 .pp-address code { font-size: 12.5px; }
 
+/* Destructive, so it is a real button rather than an underlined link — but outlined rather than
+   filled, so it never competes with "Add an item" for the eye. Colour arrives on hover, which is
+   the point at which the intent is committed. */
 .drop {
-    border: 0; background: none; color: var(--fg-muted); cursor: pointer;
-    font-family: var(--font-body); font-size: 14px; text-decoration: underline;
-    padding: 10px 4px; white-space: nowrap;
+    padding: 8px 13px; border-radius: 8px;
+    border: 1px solid var(--line); background: transparent; color: var(--fg2);
+    font-family: var(--font-body); font-size: 13px; font-weight: 600;
+    cursor: pointer; white-space: nowrap;
 }
+.drop:hover { border-color: #C5361F; color: #B3261E; }
+.drop:disabled { opacity: .5; cursor: default; }
+
+.pp-confirm {
+    display: flex; flex-direction: column; align-items: stretch; gap: 6px;
+    font-size: 13px; color: var(--fg2); white-space: nowrap;
+}
+.danger, .quiet {
+    padding: 8px 13px; border-radius: 8px; cursor: pointer;
+    font-family: var(--font-body); font-size: 13px; font-weight: 600;
+}
+.danger { border: 1px solid #B3261E; background: #B3261E; color: #fff; }
+.danger:hover { background: #961F19; border-color: #961F19; }
+.quiet { border: 1px solid var(--line); background: transparent; color: var(--fg2); }
+.quiet:hover { border-color: var(--fg-muted); color: var(--fg); }
+.danger:disabled, .quiet:disabled { opacity: .5; cursor: default; }
 .pp-status { margin: 0; font-size: 13px; color: var(--fg-muted); min-height: 1.2em; }
 
 .empty-shell { display: grid; place-items: center; min-height: 60vh; color: var(--fg2); }
@@ -64,5 +95,7 @@
 @media (max-width: 720px) {
     .pp-body, .pp-top { padding-left: 18px; padding-right: 18px; }
     .pp-head { flex-direction: column; }
-    .pp-row { grid-template-columns: 1fr; }
+    /* Both selectors, because a media query adds no specificity: a bare .pp-row here loses to
+       .pp-row.no-photo above and the row would stay two columns on a phone. */
+    .pp-row, .pp-row.no-photo { grid-template-columns: 1fr; }
 }

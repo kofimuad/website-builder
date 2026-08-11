@@ -11,7 +11,10 @@
     }
 
     <div class="img-row">
-        <label class="img-pick @(_busy ? "busy" : "")">
+        @* Dashed while the slot is empty, because that is a drop-target affordance. Once there is a
+           photo the control is an ordinary "replace" button and a dashed border just reads as
+           unfinished next to the solid Remove beside it. *@
+        <label class="img-pick @(_busy ? "busy" : "") @(string.IsNullOrWhiteSpace(Url) ? "empty" : "filled")">
             <InputFile OnChange="UploadAsync" accept="image/*" disabled="@_busy" />
             <span>@ButtonLabel</span>
         </label>

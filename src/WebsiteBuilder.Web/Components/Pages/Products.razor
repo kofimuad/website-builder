@@ -40,10 +40,17 @@
                 <button class="primary" @onclick="AddAsync" disabled="@_busy">Add an item</button>
             </div>
 
+            @* Two different things are live here and saying only the first misleads. Products save
+               straight to the live catalog, but the shop *section* lives in the draft like every
+               other section, so it takes a publish before a visitor sees any of this. *@
             @if (!_hasShopSection)
             {
-                <p class="note">Your website has no shop section yet. Add <strong>Shop</strong> from the
-                    editor's section picker and these items appear on your site.</p>
+                <p class="note">
+                    Your website has no shop section yet, so none of these items appear on it.
+                    Open the <a href="/manage/@SiteId/edit">editor</a>, add <strong>Shop</strong> from the
+                    section picker, then <strong>publish</strong> — the section is part of your draft, so it
+                    only goes live when you publish.
+                </p>
             }
 
             @if (_products.Count == 0)
@@ -57,7 +64,12 @@
                 @foreach (var product in _products)
                 {
                     <div class="pp-card @(product.IsAvailable ? "" : "off")" @key="product.Id">
-                        <div class="pp-row">
+                        @* The photo cell only exists when an image store is configured, so the
+                           column count has to follow it. Without this the grid still declared three
+                           columns, auto-placement dropped the fields into the 140px photo column
+                           and the delete button into the content column, and the whole row was
+                           inside-out on every environment with no Cloudinary keys. *@
+                        <div class="pp-row @(_images is null ? "no-photo" : "")">
                             @if (_images is not null)
                             {
                                 <ImageField Store="_images" TenantId="product.TenantId" AddLabel="Add a photo"
@@ -95,7 +107,22 @@
                                 </div>
                                 <p class="pp-address">Address on your site: <code>/products/@product.Slug</code></p>
                             </div>
-                            <button class="drop" @onclick="() => DeleteAsync(product)" disabled="@_busy">Remove</button>
+                            @* Two "Remove"s sat in this row — one detached the photo, one destroyed
+                               the product for good, and the destructive one was the quieter of the
+                               two. It is now named for what it deletes and asks first, because
+                               there is no draft to undo it from: products are live data. *@
+                            @if (_confirming == product.Id)
+                            {
+                                <div class="pp-confirm">
+                                    <span>Delete for good?</span>
+                                    <button class="danger" @onclick="() => DeleteAsync(product)" disabled="@_busy">Delete</button>
+                                    <button class="quiet" @onclick="() => _confirming = null" disabled="@_busy">Keep</button>
+                                </div>
+                            }
+                            else
+                            {
+                                <button class="drop" @onclick="() => _confirming = product.Id" disabled="@_busy">Delete item</button>
+                            }
                         </div>
                     </div>
                 }
@@ -117,6 +144,7 @@
     private bool _hasShopSection;
     private bool _busy;
     private string _status = "";
+    private Guid? _confirming;
 
     protected override async Task OnInitializedAsync()
     {
@@ -159,13 +187,17 @@
         {
             await ProductsService.DeleteAsync(product.Id);
             _products!.Remove(product);
-            _status = "Removed.";
+            _status = $"Deleted “{ProductName(product)}”.";
         }
         finally
         {
+            _confirming = null;
             _busy = false;
         }
     }
+
+    private static string ProductName(Product product) =>
+        string.IsNullOrWhiteSpace(product.Name) ? "this item" : product.Name;
 
     /// <summary>
     /// Saves on every edit rather than behind a button. A product is live data, so there is no

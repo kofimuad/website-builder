@@ -33,7 +33,7 @@
     gap: 6px;
     padding: 8px 13px;
     border-radius: 8px;
-    border: 1px dashed var(--fg-muted);
+    border: 1px solid var(--line);
     background: transparent;
     color: var(--fg);
     font-family: var(--font-body);
@@ -41,6 +41,10 @@
     font-weight: 600;
     cursor: pointer;
 }
+
+/* Empty slot: a drop target, so it is drawn like one. Filled: an ordinary button, matching
+   .img-drop beside it so the pair reads as one control group. */
+.img-pick.empty { border-style: dashed; border-color: var(--fg-muted); }
 
 .img-pick:hover { border-color: var(--accent); color: var(--accent-strong); }
 .img-pick.busy { opacity: .65; cursor: default; }
@@ -59,13 +63,14 @@
 }
 
 .img-drop {
-    padding: 8px 12px;
+    padding: 8px 13px;
     border-radius: 8px;
     border: 1px solid var(--line);
     background: transparent;
     color: var(--fg2);
     font-family: var(--font-body);
     font-size: 13px;
+    font-weight: 600;
     cursor: pointer;
 }
 
