@@ -1,0 +1,102 @@
+@page "/checkout"
+@using WebsiteBuilder.Web.Shop
+@model WebsiteBuilder.Web.Pages.CheckoutModel
+@{
+    Layout = null;
+    var chrome = Model.Chrome;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Place your order &mdash; @chrome.BusinessName</title>
+    <meta name="robots" content="noindex" />
+@await Html.PartialAsync("_SiteStyles", chrome)
+</head>
+<body class="@(chrome.HasCallBar ? "has-callbar" : "")">
+@await Html.PartialAsync("_SiteTopBar", chrome)
+
+<section>
+    <div class="wrap">
+        <p class="crumbs"><a href="/cart">&larr; Back to your order</a></p>
+        <h2>Place your order</h2>
+        <p class="muted-note">Nothing is paid here. @chrome.BusinessName will contact you to confirm
+            the order and arrange payment.</p>
+
+        <div class="checkout-layout">
+            <div>
+                @if (Model.Error is { } error)
+                {
+                    <p class="enquiry-error">@error</p>
+                }
+
+                <form method="post" class="checkout-form">
+                    <label for="customerName">Your name</label>
+                    <input id="customerName" name="customerName" type="text" required
+                           autocomplete="name" value="@Model.CustomerName" />
+
+                    <label for="phoneNumber">Phone number</label>
+                    <input id="phoneNumber" name="phoneNumber" type="tel" inputmode="tel"
+                           autocomplete="tel" value="@Model.PhoneNumber" />
+
+                    <label for="email">Email <span class="line-meta">(if you'd rather)</span></label>
+                    <input id="email" name="email" type="email" autocomplete="email" value="@Model.Email" />
+
+                    <label for="note">Anything we should know?</label>
+                    <textarea id="note" name="note" rows="3"
+                              placeholder="Where to deliver, when you need it, sizes &mdash; anything.">@Model.Note</textarea>
+
+                    @* Invisible to people, and a filled value is a bot. Same guard as the enquiry
+                       form. It must not be reachable by keyboard or announced by a screen reader. *@
+                    <div class="hp" aria-hidden="true">
+                        <label for="website">Website</label>
+                        <input id="website" name="website" type="text" tabindex="-1" autocomplete="off" />
+                    </div>
+
+                    <button class="button" type="submit">Place order</button>
+                    <p class="line-meta">We need your name and either a phone number or an email, so
+                        the business can get back to you.</p>
+                </form>
+            </div>
+
+            <aside class="checkout-summary">
+                <h3>Your order</h3>
+                <ul class="lines">
+                    @foreach (var line in Model.Lines)
+                    {
+                        <li class="line-compact">
+                            <span class="line-name">@line.Quantity &times; @line.Product.Name</span>
+                            <span class="line-meta">
+                                @if (line.TotalMinor is { } lineTotal)
+                                {
+                                    @OrderMessage.FormatMoney(lineTotal, line.Product.Currency)
+                                }
+                                else
+                                {
+                                    <text>price on request</text>
+                                }
+                            </span>
+                        </li>
+                    }
+                </ul>
+                <div class="totals">
+                    <span>Total</span>
+                    @if (Model.TotalMinor is { } total && Model.Currency is { } currency)
+                    {
+                        <strong>@OrderMessage.FormatMoney(total, currency)</strong>
+                    }
+                    else
+                    {
+                        @* Mixed currencies, or nothing priced. The owner confirms rather than us guessing. *@
+                        <strong class="line-meta">We'll confirm the total</strong>
+                    }
+                </div>
+            </aside>
+        </div>
+    </div>
+</section>
+
+@await Html.PartialAsync("_SiteFooter", chrome)
+</body>
+</html>

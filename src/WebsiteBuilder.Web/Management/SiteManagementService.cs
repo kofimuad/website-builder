@@ -21,7 +21,9 @@ public sealed record OwnedSite(
     DateTimeOffset? PublishedUtc,
     DateTimeOffset CreatedUtc,
     int TotalLeads,
-    int UnreadLeads);
+    int UnreadLeads,
+    int TotalOrders,
+    int UnreadOrders);
 
 /// <summary>
 /// Backs the owner's management pages. A site is addressed by id, and loading it puts that site's
@@ -87,7 +89,8 @@ public sealed class SiteManagementService(
     }
 
     /// <summary>
-    /// Every site the owner has, newest first, with its tenant subdomain and unread lead count.
+    /// Every site the owner has, newest first, with its tenant subdomain and unread lead and
+    /// order counts.
     /// Reads across tenants by design — this is the one query that legitimately spans them — so it
     /// filters on owner id directly instead of relying on tenant scope.
     /// </summary>
@@ -130,6 +133,21 @@ public sealed class SiteManagementService(
             })
             .ToDictionaryAsync(x => x.SiteId, cancellationToken);
 
+        // The same shape for orders, and for the same reason. Two round trips rather than one is
+        // the price of not writing a correlated subquery that cannot translate here.
+        var orderCounts = await db.Orders
+            .AsNoTracking()
+            .IgnoreQueryFilters()
+            .Where(o => siteIds.Contains(o.SiteId))
+            .GroupBy(o => o.SiteId)
+            .Select(g => new
+            {
+                SiteId = g.Key,
+                Total = g.Count(),
+                Unread = g.Count(o => !o.IsRead),
+            })
+            .ToDictionaryAsync(x => x.SiteId, cancellationToken);
+
         return sites
             .Select(s => new OwnedSite(
                 s.SiteId,
@@ -140,7 +158,9 @@ public sealed class SiteManagementService(
                 s.PublishedUtc,
                 s.CreatedUtc,
                 leadCounts.TryGetValue(s.SiteId, out var c) ? c.Total : 0,
-                leadCounts.TryGetValue(s.SiteId, out var u) ? u.Unread : 0))
+                leadCounts.TryGetValue(s.SiteId, out var u) ? u.Unread : 0,
+                orderCounts.TryGetValue(s.SiteId, out var o) ? o.Total : 0,
+                orderCounts.TryGetValue(s.SiteId, out var ou) ? ou.Unread : 0))
             .ToList();
     }
 

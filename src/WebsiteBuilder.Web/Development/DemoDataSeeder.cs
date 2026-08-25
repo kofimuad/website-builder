@@ -67,8 +67,39 @@ public static class DemoDataSeeder
             ServiceArea = "Accra",
         });
 
+        // A small catalog so the shop, the cart and the order flow are all exercisable locally
+        // without clicking a product into existence first.
+        db.Products.AddRange(BuildDemoProducts());
+
         await db.SaveChangesAsync(cancellationToken);
     }
+
+    private static IEnumerable<Product> BuildDemoProducts() =>
+    [
+        new Product
+        {
+            Name = "Basin mixer tap",
+            Slug = "basin-mixer-tap",
+            Description = "Chrome, ceramic cartridge. Fits a standard basin.",
+            PriceMinor = 24000,
+            SortOrder = 0,
+        },
+        new Product
+        {
+            Name = "Toilet flush kit",
+            Slug = "toilet-flush-kit",
+            Description = "Complete dual-flush valve and float. Fits most cisterns.",
+            PriceMinor = 13500,
+            SortOrder = 1,
+        },
+        new Product
+        {
+            Name = "Water tank installation",
+            Slug = "water-tank-installation",
+            Description = "Supply and fit a poly tank, stand and pipework.\nPrice depends on the tank size and the run.",
+            SortOrder = 2,
+        },
+    ];
 
     private static SiteDefinition BuildDemoSite() => new()
     {
@@ -142,6 +173,12 @@ public static class DemoDataSeeder
                     new OpeningHours { Day = DayOfWeek.Saturday, Opens = new TimeOnly(9, 0), Closes = new TimeOnly(13, 0) },
                     new OpeningHours { Day = DayOfWeek.Sunday, Closed = true },
                 ],
+            },
+            new ShopSection
+            {
+                Heading = "Parts and fittings",
+                Intro = "Bits and pieces we keep on the van. Order and we'll bring them with us.",
+                MaxItems = 6,
             },
             new ContactSection
             {

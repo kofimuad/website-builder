@@ -42,7 +42,12 @@ public abstract class ShopPageModel(WebsiteBuilderDbContext db) : PageModel
             return NotFound();
         }
 
-        Chrome = new SiteChrome(definition);
+        Chrome = new SiteChrome(definition)
+        {
+            // Safe here and not on the home page: every one of these pages is uncached, so the
+            // number belongs to the visitor asking for it.
+            CartCount = CartCookie.Read(HttpContext).TotalItems,
+        };
 
         // No shop section means this business does not sell online, and its /shop URL should be
         // as absent as any other page we do not serve.

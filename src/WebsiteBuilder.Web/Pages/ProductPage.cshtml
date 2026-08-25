@@ -52,10 +52,14 @@
                     <p class="enquiry-sent">Added to your order. @Model.CartCount item@(Model.CartCount == 1 ? "" : "s") so far.</p>
                 }
 
+                @* Two submits, one form. "Order now" is first and is the filled button because
+                   ordering a single item is the common case, and routing it through the cart page
+                   was the step customers were getting lost on. Both post the same quantity. *@
                 <form method="post" class="qty">
                     <label for="quantity" class="line-meta">Quantity</label>
                     <input id="quantity" name="quantity" type="number" value="1" min="1" max="99" inputmode="numeric" />
-                    <button class="button" type="submit">Add to order</button>
+                    <button class="button" type="submit" name="orderNow" value="1">Order now</button>
+                    <button class="button quiet" type="submit">Add to order</button>
                 </form>
 
                 @if (Model.CartCount > 0)

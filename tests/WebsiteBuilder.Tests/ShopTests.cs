@@ -223,4 +223,66 @@ public class ShopTests(PostgresFixture fixture) : IDisposable
         Assert.Contains("Jollof and chicken", html);
         Assert.Contains("/products/jollof-and-chicken", html);
     }
+
+    [Fact]
+    public async Task Every_page_of_a_shop_site_offers_a_way_back_to_the_basket()
+    {
+        // There was none. A customer who added something could only reach the cart from the
+        // product page they added it on, so browsing away from that page lost the order.
+        var subdomain = await SeedShopAsync(products: Jollof());
+        var client = CreateClient();
+        var host = $"http://{subdomain}.platform.com";
+
+        foreach (var path in new[] { "/", "/shop", "/products/jollof-and-chicken", "/cart" })
+        {
+            Assert.Contains("class=\"topbar-cart\"", await client.GetStringAsync($"{host}{path}"));
+        }
+    }
+
+    [Fact]
+    public async Task A_site_with_no_shop_has_no_basket_link()
+    {
+        var subdomain = await SeedShopAsync(withShopSection: false);
+
+        Assert.DoesNotContain("class=\"topbar-cart\"", await CreateClient().GetStringAsync($"http://{subdomain}.platform.com/"));
+    }
+
+    [Fact]
+    public async Task The_basket_count_never_reaches_the_cached_home_page()
+    {
+        // The home page is output-cached per tenant, so a count rendered into it would be one
+        // visitor's basket served to every visitor. The shop pages are uncached and do show it.
+        var subdomain = await SeedShopAsync(products: Jollof());
+        var client = CreateClient();
+        var host = $"http://{subdomain}.platform.com";
+
+        var added = await client.PostAsync(
+            $"{host}/products/jollof-and-chicken",
+            new FormUrlEncodedContent([new KeyValuePair<string, string>("quantity", "3")]));
+
+        var cookie = Assert.Single(added.Headers.GetValues("Set-Cookie")).Split(';')[0];
+
+        var shop = new HttpRequestMessage(HttpMethod.Get, $"{host}/shop");
+        shop.Headers.Add("Cookie", cookie);
+        Assert.Contains("class=\"topbar-cart-count\"", await (await client.SendAsync(shop)).Content.ReadAsStringAsync());
+
+        var home = new HttpRequestMessage(HttpMethod.Get, $"{host}/");
+        home.Headers.Add("Cookie", cookie);
+        var homeHtml = await (await client.SendAsync(home)).Content.ReadAsStringAsync();
+
+        Assert.Contains("class=\"topbar-cart\"", homeHtml);
+        Assert.DoesNotContain("class=\"topbar-cart-count\"", homeHtml);
+    }
+
+    [Fact]
+    public async Task The_shop_page_carries_the_owners_own_heading()
+    {
+        // It said "Shop" regardless. A business that renamed the section had it renamed everywhere
+        // except the page its own "See everything" button leads to.
+        var subdomain = await SeedShopAsync(products: Jollof());
+
+        var html = await CreateClient().GetStringAsync($"http://{subdomain}.platform.com/shop");
+
+        Assert.Contains("Our menu", html);
+    }
 }

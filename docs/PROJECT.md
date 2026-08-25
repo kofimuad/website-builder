@@ -425,9 +425,9 @@ the only cost is that a link shared before a rename stops working.
 ### What a tenant host serves
 
 `TenantResolutionMiddleware` used to serve only `/`. It now serves an **allowlist** — `/shop`,
-`/products/{slug}`, `/cart` — and nothing else. An allowlist rather than a blocklist, and it stays
-one: a dashboard reachable at `joesplumbing.csbuild.app` is both a leak and a phishing surface.
-Adding a public page means adding it there deliberately.
+`/products/{slug}`, `/cart`, `/checkout`, `/order/{reference}` — and nothing else. An allowlist
+rather than a blocklist, and it stays one: a dashboard reachable at `joesplumbing.csbuild.app` is
+both a leak and a phishing surface. Adding a public page means adding it there deliberately.
 
 ### The cart
 
@@ -444,7 +444,81 @@ a currency** — a business selling in cedis and dollars gets no total rather th
 the owner confirms. Unpriced products are a real way to sell here and list as "ask for a price".
 
 Shop pages are deliberately **not output-cached**: the cart is per-visitor and the catalog is live.
-The home page still is, because it is the same for everybody.
+The home page still is, because it is the same for everybody — **and that is exactly what made the
+"price is not showing" bug**. See below.
+
+### The catalog and the output cache
+
+The home page is cached per tenant for five minutes, tagged `tenant:{id}`. For a long time only
+`SitePublisher` evicted that tag — but products have no publish step, so an owner who changed a
+price got "Saved" on the products page and their own website carried on showing the old one, with
+nothing they could press to force it through. The worst shape of it: adding the *first* price to an
+item left the live site saying "Ask for a price".
+
+`ProductsService` now evicts the tenant's tag after every catalog write — add, save, delete,
+reorder. Eviction is **by tenant tag, never global**: one business editing a price must not throw
+away every other business's cached page. `ShopCacheTests` pins all of it, and every one of those
+tests fails if the eviction is removed.
+
+A useful way to recognise this class of bug in future: `/shop` and `/products/{slug}` are
+uncached, so a value that is right there and stale on the home page is a cache problem, not a save
+problem.
+
+### Getting back to the basket
+
+Every page of a shop-enabled site carries a **basket link in the top bar**. It is there because it
+was not: the only route to `/cart` was a line on the product page a customer had just added from, so
+browsing anywhere else silently stranded the order.
+
+The **count is rendered only where it can be trusted.** `SiteChrome.CartCount` is set by
+`ShopPageModel` — which backs `/shop`, `/products/{slug}`, `/cart` and `/checkout`, all uncached —
+and is left null on the home page, which is output-cached per tenant. A count baked into that page
+would be one visitor's basket shown to everybody. The link itself still renders on the home page;
+only the number is withheld. `ShopTests` pins both halves.
+
+`/shop` renders the **owner's own heading and intro**, not the word "Shop". A business that renamed
+the section to "Our menu" had it renamed everywhere except the page its own "See everything" button
+leads to.
+
+### Orders
+
+An order is a **relational record**, created before anything is sent anywhere. Ecommerce v1 ended
+at a `wa.me` link, which meant the order existed only if the customer actually pressed send in
+WhatsApp, and neither side had a record either way. The flow now is:
+
+`/products/{slug}` → **Order now** (or Add to order → `/cart`) → `/checkout` → `/order/{reference}`
+
+- **"Order now" posts the same cart** as "Add to order" and then redirects to the checkout, so the
+  single-item path and the basket path cannot drift apart.
+- **`/checkout`** takes a name, a phone and/or email, and an optional note. The rule is the lead
+  rule: a name plus one way to reply, because the owner fulfils this by contacting the customer.
+  It carries the same honeypot as the enquiry form.
+- **`OrdersService.PlaceAsync` commits first, then notifies.** `EmailOrderNotifier` mirrors
+  `EmailLeadNotifier` exactly, including swallowing its own failures: the order is already saved,
+  and a customer must never see an error because the owner's mail provider was unreachable.
+- **`/order/{reference}`** confirms, and *then* offers WhatsApp — now a nudge rather than the order
+  itself.
+
+**`OrderItem` copies the product's name and price rather than pointing at them.** This is the
+counterpart of "a product is live the moment it is saved": the owner can re-price a live product
+minutes after the order arrives, and an order that re-priced itself with them would be a record of
+nothing. `ProductId` is kept alongside the snapshot only so the owner can click through, and goes
+null rather than taking the order with it if the product is deleted — which is why `OrderItems` has
+**no foreign key to `Products`**.
+
+The **reference** (`K4P2QX`) is what the customer quotes and the owner searches for, because the
+rest of this conversation happens on WhatsApp or the phone where a Guid is unusable. Six characters
+from an alphabet with no `0/O`, `1/I/L` or `5/S` in it, drawn from a cryptographic RNG — a
+guessable reference would let one customer ask after another's order. Unique per tenant, like a
+product slug.
+
+The owner reads them at `/manage/{siteId}/orders`, an inbox modelled on the leads one — same
+mark-as-read-on-open behaviour, and the same `prerender: false` requirement for it. Status
+(`New → Confirmed → Fulfilled`, or `Cancelled`) is moved **by hand**: there is no payment and no
+courier to hear it from.
+
+Still not built: payments, stock levels, delivery. `IOrderNotifier` and the status enum are where
+Paystack would attach.
 
 ## 9. Images
 
@@ -548,6 +622,7 @@ domain is *unreachable*, not merely insecure.
 | `DATABASE_URL` | Blank is treated as missing — an unresolved Railway reference arrives as `""` |
 | `TenantResolution__PlatformDomain` | `csbuild.app`. Left at the `localhost` default, every real host 404s |
 | `Platform__PublicBaseUrl` | `https://csbuild.app`. Links in email are built from it |
+| `Platform__ExampleSiteUrl` | Optional. The published site behind the landing page's "See a live example". **Unset in production hides the button** rather than rendering a dead one; in development it falls back to the seeded demo tenant |
 | `Email__ApiKey` | Resend API key (`re_…`). **The path that works on Railway** — SMTP is blocked below Pro |
 | `Email__SmtpHost` / `SmtpPort` / `SmtpUser` / `SmtpPassword` | Only used when `Email__ApiKey` is unset. On Resend the user is literally `resend` |
 | `Email__FromAddress` | **Required** once either is set |
@@ -631,6 +706,8 @@ more precisely than a live call could.
 | WB-9 Domains | Publish is done; unpublish/rollback and custom domains are not |
 | WB-3 | WB-45 category templates are built (§5); the on-a-phone design review is not done |
 
-**Ecommerce v1 is built** — catalog, cart and order-on-WhatsApp. See §8a. Not built: payments,
-stock levels, order records, delivery. An order exists only as a WhatsApp message; nothing about it
-is stored, which is the honest description of what this version does.
+**Ecommerce is built through to a recorded order** — catalog, cart, a checkout, a stored `Order`
+with snapshotted line prices, an emailed notification, and an orders inbox with a hand-moved status.
+See §8a. Not built: **payments, stock levels, delivery**. Money still changes hands off the
+platform, which is the honest description of what this version does — but the order itself now
+survives the customer never opening WhatsApp, which is what v1 could not do.

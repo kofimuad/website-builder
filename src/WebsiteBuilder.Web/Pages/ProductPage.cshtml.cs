@@ -32,7 +32,18 @@ public class ProductPageModel(WebsiteBuilderDbContext db, ShopCatalog catalog) :
         return Page();
     }
 
-    public async Task<IActionResult> OnPostAsync(string slug, int quantity = 1)
+    /// <summary>
+    /// Adds this product to the cart, and — when the customer used "Order now" — takes them
+    /// straight to the checkout.
+    /// <para>
+    /// The direct route exists because ordering one thing was the common case and the cart was in
+    /// the way of it: a customer who wanted a single item had to add it, find the cart, and only
+    /// then discover how to order. Both buttons go through the same cart so the two paths cannot
+    /// drift apart, and so an item added on the way to checkout is still there if the customer
+    /// backs out and carries on shopping.
+    /// </para>
+    /// </summary>
+    public async Task<IActionResult> OnPostAsync(string slug, int quantity = 1, string? orderNow = null)
     {
         if (await LoadAsync(slug) is { } refusal)
         {
@@ -44,7 +55,7 @@ public class ProductPageModel(WebsiteBuilderDbContext db, ShopCatalog catalog) :
         CartCookie.Write(HttpContext, cart);
 
         // Redirect after post so a refresh does not add the item again.
-        return Redirect($"/products/{Product.Slug}?added=1");
+        return Redirect(orderNow is not null ? "/checkout" : $"/products/{Product.Slug}?added=1");
     }
 
     private async Task<IActionResult?> LoadAsync(string slug)

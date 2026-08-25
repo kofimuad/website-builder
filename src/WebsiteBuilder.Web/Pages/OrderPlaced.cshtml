@@ -1,0 +1,81 @@
+@page "/order/{reference}"
+@using WebsiteBuilder.Web.Shop
+@model WebsiteBuilder.Web.Pages.OrderPlacedModel
+@{
+    Layout = null;
+    var chrome = Model.Chrome;
+    var order = Model.Order;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Order @order.Reference &mdash; @chrome.BusinessName</title>
+    <meta name="robots" content="noindex" />
+@await Html.PartialAsync("_SiteStyles", chrome)
+</head>
+<body class="@(chrome.HasCallBar ? "has-callbar" : "")">
+@await Html.PartialAsync("_SiteTopBar", chrome)
+
+<section>
+    <div class="wrap">
+        <div class="order-done">
+            <h2>Thank you, @order.CustomerName.</h2>
+            <p>@chrome.BusinessName has your order and will be in touch to confirm it and arrange
+                payment. Nothing has been paid yet.</p>
+
+            <p class="order-ref">Your order number<strong>@order.Reference</strong></p>
+
+            <ul class="lines">
+                @foreach (var item in order.Items)
+                {
+                    <li class="line-compact">
+                        <span class="line-name">@item.Quantity &times; @item.ProductName</span>
+                        <span class="line-meta">
+                            @if (item.LineTotalMinor is { } lineTotal)
+                            {
+                                @OrderMessage.FormatMoney(lineTotal, item.Currency)
+                            }
+                            else
+                            {
+                                <text>price on request</text>
+                            }
+                        </span>
+                    </li>
+                }
+            </ul>
+
+            <div class="totals">
+                <span>Total</span>
+                @if (order.TotalMinor is { } total && order.Currency is { } currency)
+                {
+                    <strong>@OrderMessage.FormatMoney(total, currency)</strong>
+                }
+                else
+                {
+                    <strong class="line-meta">To be confirmed</strong>
+                }
+            </div>
+
+            @if (Model.WhatsAppLink is { } link)
+            {
+                @* Optional now, not the order itself — the order is already saved and emailed.
+                   It is still here because a message in the owner's chat is what most of them
+                   actually watch. *@
+                <p><a class="whatsapp-order" href="@link">Send @chrome.BusinessName a message about it</a></p>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(chrome.Contact?.PhoneNumber))
+            {
+                <p class="line-meta">Or call <a href="tel:@chrome.Contact.PhoneNumber">@chrome.Contact.PhoneNumber</a>.</p>
+            }
+
+            <p class="crumbs"><a href="/shop">Keep shopping</a></p>
+        </div>
+    </div>
+</section>
+
+@await Html.PartialAsync("_SiteFooter", chrome)
+</body>
+</html>

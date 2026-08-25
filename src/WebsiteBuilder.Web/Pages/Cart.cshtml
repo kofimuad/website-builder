@@ -33,15 +33,15 @@
             <ul class="lines">
                 @foreach (var line in Model.Lines)
                 {
-                    <li class="line">
+                    @* The photo column only exists when there is a photo. It used to be held open by
+                       an empty span, so an item with no picture lost 4rem of a 360px screen to
+                       nothing and its name wrapped mid-phrase. Same fix, and same reason, as the
+                       products page in the builder. *@
+                    <li class="line @(string.IsNullOrWhiteSpace(line.Product.ImageUrl) ? "line-no-photo" : "")">
                         @if (!string.IsNullOrWhiteSpace(line.Product.ImageUrl))
                         {
                             <img src="@ImageDelivery.Cropped(line.Product.ImageUrl, 160, 160)"
                                  alt="" width="160" height="160" loading="lazy" decoding="async" />
-                        }
-                        else
-                        {
-                            <span></span>
                         }
                         <span>
                             <span class="line-name">@line.Product.Name</span>
@@ -78,20 +78,22 @@
                 }
             </div>
 
+            @* Checkout first, WhatsApp second. It used to be WhatsApp only, which meant the order
+               existed only if the customer actually pressed send in the app they were handed off
+               to — and if they did not, neither they nor the owner had anything. Placing the
+               order records it and emails the owner; the message is then a nudge on top. *@
+            <p><a class="button" href="/checkout">Place your order</a></p>
+            <p class="line-meta">Nothing is paid here. @chrome.BusinessName will confirm your order
+                and arrange payment with you.</p>
+
             @if (Model.OrderLink is { } orderLink)
             {
-                <p><a class="whatsapp-order" href="@orderLink">Send this order on WhatsApp</a></p>
-                <p class="line-meta">This opens WhatsApp with your order already written. Nothing is
-                    paid here &mdash; @chrome.BusinessName will confirm and arrange payment with you.</p>
+                <p class="alt-order">Or <a href="@orderLink">send it straight to @chrome.BusinessName on WhatsApp</a>
+                    without leaving your details.</p>
             }
-            else
+            else if (!string.IsNullOrWhiteSpace(chrome.Contact?.PhoneNumber))
             {
-                <p class="muted-note">This business has not added a WhatsApp number yet.
-                    @if (!string.IsNullOrWhiteSpace(chrome.Contact?.PhoneNumber))
-                    {
-                        <text>Call <a href="tel:@chrome.Contact.PhoneNumber">@chrome.Contact.PhoneNumber</a> to order.</text>
-                    }
-                </p>
+                <p class="alt-order">Or call <a href="tel:@chrome.Contact.PhoneNumber">@chrome.Contact.PhoneNumber</a> to order.</p>
             }
         }
     </div>

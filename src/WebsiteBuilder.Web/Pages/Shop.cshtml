@@ -10,7 +10,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Shop &mdash; @chrome.BusinessName</title>
+    <title>@(chrome.Shop?.Heading is { Length: > 0 } t ? t : "Shop") &mdash; @chrome.BusinessName</title>
 @await Html.PartialAsync("_SiteStyles", chrome)
 </head>
 <body class="@(chrome.HasCallBar ? "has-callbar" : "")">
@@ -18,7 +18,14 @@
 
 <section>
     <div class="wrap">
-        <h2>Shop</h2>
+        @* The owner's own heading, not the word "Shop". A business that renamed the section to
+           "Our menu" or "Parts and fittings" had it renamed everywhere except the page the
+           "See everything" button leads to, which is the one place it looked like a different site. *@
+        <h2>@(chrome.Shop?.Heading is { Length: > 0 } heading ? heading : "Shop")</h2>
+        @if (chrome.Shop?.Intro is { Length: > 0 } intro)
+        {
+            <p>@intro</p>
+        }
         @if (Model.Products.Count == 0)
         {
             <p class="muted-note">There is nothing in the shop just now. Please check back soon.</p>

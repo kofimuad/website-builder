@@ -1,6 +1,6 @@
 # Session handoff — CS Build
 
-Paste this into a new chat to continue where the last one stopped. Last updated 2026-08-11.
+Paste this into a new chat to continue where the last one stopped. Last updated 2026-08-25.
 
 > Read `docs/PROJECT.md` first — it describes the whole codebase. This file covers only what is
 > *live, decided, or pending* right now, and the things a fresh session would otherwise get wrong.
@@ -21,6 +21,45 @@ project **WB** on `csharpworks.atlassian.net` (cloudId `69108580-d8d9-4c90-a102-
 `main` is at **`4a5326e`**, committed and pushed. Kofi commits as work lands, so a clean working
 tree is the normal state — check `git log` rather than assuming, as an earlier version of this file
 claimed everything was unpushed long after it had been.
+
+**Added 2026-08-25 — ecommerce finished to a recorded order, and the price bug found.**
+Uncommitted at the time of writing. Four things, in order of how much they matter:
+
+1. **"The price is not showing" was an output-cache bug, and it is fixed.** The tenant home page is
+   cached for five minutes tagged by tenant, and only *publishing* evicted that tag — but products
+   have no publish step. So a saved price sat behind a stale page with nothing the owner could press.
+   `ProductsService` now evicts the tenant's tag on every catalog write. Reproduced in the browser
+   before the fix and verified after; `ShopCacheTests` (5 tests) all fail if the eviction is removed.
+   **The rendering of prices was never broken** — `/shop` is uncached and always showed the new value,
+   which is the tell.
+2. **Orders are real records now.** `Order` + `OrderItem`, `/checkout`, `/order/{reference}`, an
+   `EmailOrderNotifier` mirroring the lead one, and an orders inbox at `/manage/{id}/orders` with a
+   hand-moved status. An "Order now" button on a product page goes straight to checkout. Line prices
+   are **snapshotted**, so re-pricing a product does not rewrite history. See `docs/PROJECT.md` §8a.
+3. **The shop section had no case in the editor at all** — adding one from the picker produced a
+   blank block. It now edits its heading, intro and item count, and links out to Products.
+4. **"See a live example" pointed at `#example`, an anchor that has never existed on the page**, so
+   the button did nothing. It now opens a real published site in a new tab, from
+   `Platform__ExampleSiteUrl`, falling back to the seeded demo in development. **Production needs
+   that variable set or the button does not render** — deliberate, a hidden button beats a dead one.
+
+Three small layout fixes came with it, all found on a 360px viewport and invisible in source: the
+product page's two buttons squeezed instead of wrapping, a cart line with no photo lost 4rem to an
+empty grid column, and "We'll confirm the total" rendered at heading size.
+
+**Then a second pass over the shop found the real missing button: there was no link to the basket
+anywhere.** `/cart` was reachable only from the product page a customer had just added from, so
+browsing on lost the order. The top bar now carries a basket link on every page of a shop site, with
+a count on the uncached pages and deliberately none on the cached home page. `/shop` also stopped
+saying "Shop" over a section the owner had renamed. Adding the basket crowded the 360px top bar, so
+the brand now truncates rather than wrapping the call button onto two lines.
+
+Everything else in the editor checked out under clicking: move up/down, remove, undo, the section
+picker and the ✨ assistant all work on a Shop section (the assistant walks section JSON generically,
+so it needed no shop-specific code).
+
+**The footer's `#help` and `#privacy` links are still dead** — same class of bug as `#example`, left
+alone because writing Help and Privacy pages is a decision, not a fix.
 
 **Added 2026-08-10 — the published-site template got its "wow factor" pass** (`1b19ba2`, `fe153b9`),
 which is the answer to the "generated sites look plain" note below: `_RenderedSite.cshtml` largely
@@ -78,7 +117,7 @@ model only writes copy and picks one of three palettes.
    outbound SMTP below the Pro plan** and drops the packets rather than refusing them. The app now
    sends over Resend's HTTPS API when `Email__ApiKey` is set. Untried against the real API.
 
-**Tests: 455 total, all passing, ~17s, and free.** `TenantAppFactory` blanks every provider's API
+**Tests: 473 total, all passing, ~20s, and free.** `TenantAppFactory` blanks every provider's API
 key for the test host. The old lone failure —
 `OnboardingProgressAndPreviewTests.Completing_onboarding_reports_the_real_stages_in_order` — was
 never a defect: with no credit Claude threw, the template fallback ran, and `WritingCopy` was
@@ -165,6 +204,16 @@ reported twice. It passes now because the host never takes the model path.
   after it renders as literal text on the customer's live site. It shipped that way once, showing
   `if (ViewData["EnquirySent"] is true) {` above every contact form.
   `SiteRendererTests.No_razor_source_leaks_into_the_rendered_page` guards it now.
+- **Anything live and relational shown on the home page needs a cache eviction.** The tenant home
+  page is output-cached for five minutes tagged `tenant:{id}`. Publishing evicts it; nothing else
+  did, which is what made saved prices invisible for five minutes and cost a real bug report.
+  `ProductsService` evicts it now — **any future thing that appears on the published page without a
+  publish step must do the same**, and by tenant tag, never globally. The diagnostic: `/shop` and
+  `/products/{slug}` are uncached, so if a value is correct there and stale on `/`, it is the cache.
+- **A blank block in the editor means a missing `case` in its `@switch`.** `ShopSection` had none,
+  so adding a shop from the picker produced a section with nothing in it and no error anywhere. When
+  adding a section type, the catalog entry, the renderer case and the **editor case** are three
+  separate places, and only the first two will shout at you.
 - **A generic-looking site is not proof the model failed.** The onboarding preview never calls it,
   by design. Check the startup banner and grep the log for `AI GENERATION FAILED`.
 - **Railway blocks outbound SMTP below the Pro plan**, by dropping packets. Anything that needs an
@@ -222,22 +271,16 @@ click-through. Remaining backlog, in the order last discussed:
    shipping". A 360×800 emulated pass on 2026-08-10 found no horizontal overflow and no clipped
    content, but that is emulation, not a real handset, and it covered only the plumbing demo — not
    the other six category templates. Nothing has been committed or transitioned.
-2. ~~**Ecommerce v1.**~~ Built 2026-08-09: `Product` rows, a `shop` section, `/shop`,
-   `/products/{slug}` and `/cart` on tenant hosts, a cookie cart, an order composed into a WhatsApp
-   message, and a products page in the builder. See `docs/PROJECT.md` §8a. **Never exercised
-   against a real order** — no payment, no stored order, no stock.
+2. ~~**Ecommerce v1.**~~ ~~Built 2026-08-09.~~ **Finished 2026-08-25** to a stored order — see the
+   top of this file and `docs/PROJECT.md` §8a. Exercised end to end in the browser: added to a cart,
+   placed an order, read it in the inbox, moved its status. **Payments, stock and delivery are still
+   not built**, and Paystack is still the answer when they are (Stripe cannot take a Ghana-registered
+   merchant — see below).
 3. **WB-35** — SEO. Scoped from browser evidence: `LocalBusiness` JSON-LD first (nearly free, the
    data is already in `HoursMapSection` and `ContactSection`), then OG/Twitter tags with a
    Cloudinary-generated 1200×630 share image, then `robots.txt` + per-tenant `sitemap.xml`, then
    canonical + favicon. **og:image matters unusually much here** — these users share on WhatsApp,
    where a missing one renders as a broken grey stub.
-3. **Ecommerce** — under consideration, not started. Two findings already established:
-   - **Products must be relational entities, not part of the jsonb site definition.** Stock is
-     written by *customers*, not by the owner editing; publishing a draft would clobber live
-     inventory; and orders need a foreign key target. Mirror the existing `Lead` pattern — a
-     relational entity plus a thin presentation-only section in the JSON.
-   - **`TenantResolutionMiddleware` serves only `/` on a tenant host.** `/products/{slug}`, `/cart`
-     and `/checkout` need that restriction relaxed before a single product page can render.
 4. **The rename sweep in `ui.pen`** — Kofi's job, needs Pencil.
 
 ---

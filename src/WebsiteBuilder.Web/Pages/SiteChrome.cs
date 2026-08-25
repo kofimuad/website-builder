@@ -64,6 +64,20 @@ public sealed class SiteChrome
 
     public bool HasShop => Visible.OfType<ShopSection>().Any();
 
+    /// <summary>The shop section, for pages that render the catalog under the owner's own heading.</summary>
+    public ShopSection? Shop => Visible.OfType<ShopSection>().FirstOrDefault();
+
+    /// <summary>
+    /// How many items are in this visitor's basket, or null when the page must not say.
+    /// <para>
+    /// Null on the home page <b>on purpose</b>: it is output-cached per tenant, so a count baked
+    /// into it would be one visitor's basket shown to everybody. The shop pages are uncached and
+    /// set it. The basket link itself still renders either way — it is a nav item, and a customer
+    /// who has added something needs a way back to it from any page.
+    /// </para>
+    /// </summary>
+    public int? CartCount { get; set; }
+
     /// <summary>
     /// One anchor per section, so the nav can link to it and a repeated section type cannot
     /// produce two elements with the same id.

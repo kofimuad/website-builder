@@ -14,7 +14,8 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next, IOptions<Te
     public const string SitePath = "/site";
 
     /// <summary>
-    /// The only paths a tenant host serves besides <c>/</c>.
+    /// The only paths a tenant host serves besides <c>/</c>: the catalog, a product, the cart, the
+    /// checkout, and a placed order's confirmation.
     /// <para>
     /// An allowlist rather than a blocklist, and it stays one. The rule this enforces is that no
     /// builder page can ever appear on a customer's own domain — a dashboard reachable at
@@ -22,7 +23,7 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next, IOptions<Te
     /// tenant site means adding it here deliberately, which is the point.
     /// </para>
     /// </summary>
-    private static readonly string[] PublicPaths = ["/shop", "/products", "/cart"];
+    private static readonly string[] PublicPaths = ["/shop", "/products", "/cart", "/checkout", "/order"];
 
     private readonly TenantResolutionOptions _options = options.Value;
 
@@ -56,7 +57,8 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next, IOptions<Te
 
                 tenantContext.TenantId = tenantId;
 
-                // A tenant host serves that tenant's published site, its shop, and nothing else.
+                // A tenant host serves that tenant's published site, its shop and checkout, and
+                // nothing else.
                 // Requests for files (images, fonts, css) fall through to static assets; anything
                 // outside the allowlist would otherwise reach builder pages on a customer's domain.
                 if (context.Request.Path == "/")

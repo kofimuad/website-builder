@@ -40,7 +40,7 @@ public static class SectionCatalog
         new("cta", "Call to action", "A closing prompt with a button.",
             () => new CtaSection { Headline = "Ready to get started?", ButtonLabel = "Get in touch", ButtonUrl = "#contact" }),
 
-        new("shop", "Shop", "Things you sell, with a cart and orders over WhatsApp.",
+        new("shop", "Shop", "Things you sell, with a basket and orders sent to your inbox.",
             () => new ShopSection { Heading = "Shop" }),
     ];
 }

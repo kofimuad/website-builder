@@ -120,6 +120,10 @@ else
 // under the resolved tenant rather than snapshotted into the published document.
 builder.Services.AddScoped<ShopCatalog>();
 builder.Services.AddScoped<ProductsService>();
+builder.Services.AddScoped<OrdersService>();
+// Scoped, not singleton: it resolves the owner through the request's DbContext, exactly as
+// EmailLeadNotifier does.
+builder.Services.AddScoped<IOrderNotifier, EmailOrderNotifier>();
 
 // Photo uploads (WB-23). Cloudinary keeps the original and resizes on delivery, so the editor
 // stores a URL and each slot asks for the size it needs. Without credentials the editor offers no

@@ -15,6 +15,20 @@
             <a href="@Model.NavHref(link.Anchor)">@link.Label</a>
         }
     </span>
+    @* The way back to the basket. There was none: a customer who added something could only reach
+       the cart from the product page they added it on, so leaving that page lost the order. The
+       count is only rendered where it can be trusted — see SiteChrome.CartCount. *@
+    @if (Model.HasShop)
+    {
+        <a class="topbar-cart" href="/cart" aria-label="Your order">
+            <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
+            <span class="topbar-cart-label">Order</span>
+            @if (Model.CartCount is > 0 and var count)
+            {
+                <span class="topbar-cart-count">@count</span>
+            }
+        </a>
+    }
     @if (Model.Hero is { CallToActionLabel: { Length: > 0 } label, CallToActionUrl: { Length: > 0 } url })
     {
         <a class="button" href="@url">@label</a>

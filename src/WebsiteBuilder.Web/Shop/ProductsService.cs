@@ -1,7 +1,10 @@
+using Microsoft.AspNetCore.OutputCaching;
 using Microsoft.EntityFrameworkCore;
 using WebsiteBuilder.Core.Entities;
 using WebsiteBuilder.Core.SiteModel;
+using WebsiteBuilder.Core.Tenancy;
 using WebsiteBuilder.Data;
+using WebsiteBuilder.Web.Caching;
 
 namespace WebsiteBuilder.Web.Shop;
 
@@ -13,9 +16,36 @@ namespace WebsiteBuilder.Web.Shop;
 /// filter does the rest, so none of these can reach another business's products.
 /// </para>
 /// </summary>
-public sealed class ProductsService(WebsiteBuilderDbContext db)
+public sealed class ProductsService(
+    WebsiteBuilderDbContext db,
+    ITenantContext tenantContext,
+    IOutputCacheStore cache)
 {
     private const int MaxSlugLength = 100;
+
+    /// <summary>
+    /// Drops the tenant's cached home page after any change to the catalog.
+    /// <para>
+    /// This is the other half of "products are live the moment they are saved". They are — but the
+    /// published site's home page is output-cached for five minutes and tagged by tenant, and only
+    /// <c>SitePublisher</c> was evicting that tag. So an owner who added a price, or a whole
+    /// product, saw the products page say "Saved" and their own website carry on showing the old
+    /// catalog, with no publish available to force it through. That is the "the price is not
+    /// showing" report: the price was saved, the page was stale.
+    /// </para>
+    /// <para>
+    /// The shop's own pages (<c>/shop</c>, <c>/products/{slug}</c>, <c>/cart</c>) are deliberately
+    /// not cached, which is why the same price was visible there all along — a useful way to tell
+    /// this failure apart from an actual save failure.
+    /// </para>
+    /// </summary>
+    private async Task EvictSiteCacheAsync(CancellationToken cancellationToken)
+    {
+        if (tenantContext.TenantId is { } tenantId)
+        {
+            await cache.EvictByTagAsync(TenantSiteCachePolicy.TagFor(tenantId), cancellationToken);
+        }
+    }
 
     /// <summary>Everything the owner has, available or not, in the order the shop shows them.</summary>
     public Task<List<Product>> ListAsync(CancellationToken cancellationToken = default) =>
@@ -36,6 +66,7 @@ public sealed class ProductsService(WebsiteBuilderDbContext db)
 
         db.Products.Add(product);
         await db.SaveChangesAsync(cancellationToken);
+        await EvictSiteCacheAsync(cancellationToken);
 
         return product;
     }
@@ -60,6 +91,7 @@ public sealed class ProductsService(WebsiteBuilderDbContext db)
         product.UpdatedUtc = DateTimeOffset.UtcNow;
 
         await db.SaveChangesAsync(cancellationToken);
+        await EvictSiteCacheAsync(cancellationToken);
     }
 
     public async Task DeleteAsync(Guid productId, CancellationToken cancellationToken = default)
@@ -70,6 +102,7 @@ public sealed class ProductsService(WebsiteBuilderDbContext db)
         {
             db.Products.Remove(product);
             await db.SaveChangesAsync(cancellationToken);
+            await EvictSiteCacheAsync(cancellationToken);
         }
     }
 
@@ -88,6 +121,7 @@ public sealed class ProductsService(WebsiteBuilderDbContext db)
         }
 
         await db.SaveChangesAsync(cancellationToken);
+        await EvictSiteCacheAsync(cancellationToken);
     }
 
     private async Task<int> NextSortOrderAsync(CancellationToken cancellationToken)

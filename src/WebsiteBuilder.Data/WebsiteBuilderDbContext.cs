@@ -24,6 +24,7 @@ public class WebsiteBuilderDbContext : DbContext
     public DbSet<BusinessProfile> BusinessProfiles => Set<BusinessProfile>();
     public DbSet<Lead> Leads => Set<Lead>();
     public DbSet<Product> Products => Set<Product>();
+    public DbSet<Order> Orders => Set<Order>();
     public DbSet<Owner> Owners => Set<Owner>();
     public DbSet<SignInToken> SignInTokens => Set<SignInToken>();
 
@@ -144,6 +145,45 @@ public class WebsiteBuilderDbContext : DbContext
             e.HasOne<Tenant>().WithMany().HasForeignKey(p => p.TenantId).OnDelete(DeleteBehavior.Cascade);
         });
 
+        modelBuilder.Entity<Order>(e =>
+        {
+            e.HasKey(o => o.Id);
+            e.Property(o => o.Reference).HasMaxLength(12).IsRequired();
+            e.Property(o => o.CustomerName).HasMaxLength(200).IsRequired();
+            e.Property(o => o.PhoneNumber).HasMaxLength(40);
+            e.Property(o => o.Email).HasMaxLength(200);
+            e.Property(o => o.Note).HasMaxLength(2000);
+            e.Property(o => o.Currency).HasMaxLength(3);
+            e.Property(o => o.Status).HasConversion<string>().HasMaxLength(32);
+
+            // The reference is quoted by the customer and looked up by the owner, so it has to be
+            // unique — but only within the tenant, for the same reason a product slug is: two
+            // businesses arriving at "K4P2QX" on the same day is a coincidence, not a conflict.
+            e.HasIndex(o => new { o.TenantId, o.Reference }).IsUnique();
+
+            // The inbox reads a tenant's orders newest-first; index the sort it always uses.
+            e.HasIndex(o => new { o.TenantId, o.CreatedUtc });
+
+            e.HasOne<Tenant>().WithMany().HasForeignKey(o => o.TenantId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<Site>().WithMany().HasForeignKey(o => o.SiteId).OnDelete(DeleteBehavior.Cascade);
+
+            // Items only ever exist as part of their order and are always loaded with it.
+            e.OwnsMany(o => o.Items, items =>
+            {
+                items.ToTable("OrderItems");
+                items.WithOwner().HasForeignKey(i => i.OrderId);
+                items.HasKey(i => i.Id);
+                items.Property(i => i.ProductName).HasMaxLength(200).IsRequired();
+                items.Property(i => i.Currency).HasMaxLength(3).IsRequired();
+                items.Ignore(i => i.LineTotalMinor);
+
+                // No foreign key to Products on purpose. The line carries its own copy of the name
+                // and price, so it must outlive the product; a real FK would either block the
+                // delete or cascade the order away with it.
+                items.HasIndex(i => i.ProductId);
+            });
+        });
+
         modelBuilder.Entity<Lead>(e =>
         {
             e.HasKey(l => l.Id);
@@ -171,6 +211,9 @@ public class WebsiteBuilderDbContext : DbContext
 
         modelBuilder.Entity<Product>()
             .HasQueryFilter(p => _tenantContext.TenantId != null && p.TenantId == _tenantContext.TenantId);
+
+        modelBuilder.Entity<Order>()
+            .HasQueryFilter(o => _tenantContext.TenantId != null && o.TenantId == _tenantContext.TenantId);
 
         base.OnModelCreating(modelBuilder);
     }

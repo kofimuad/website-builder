@@ -13,6 +13,18 @@ public sealed class PlatformOptions
     /// in email are correct even when generated behind a proxy.
     /// </summary>
     public string? PublicBaseUrl { get; set; }
+
+    /// <summary>
+    /// A published site to show off from the landing page's "See a live example" button.
+    /// <para>
+    /// Configuration rather than a hard-coded address because the site worth showing differs by
+    /// environment: locally it is the seeded demo, and in production it should be a real customer's
+    /// site (with their agreement) or a demo tenant that has actually been published. Blank means
+    /// there is nothing to show, and the button is <b>hidden</b> rather than rendered dead — which
+    /// is what it had been doing, pointing at an <c>#example</c> anchor that was never on the page.
+    /// </para>
+    /// </summary>
+    public string? ExampleSiteUrl { get; set; }
 }
 
 /// <summary>
@@ -79,6 +91,8 @@ public sealed class PlatformUrls(
     }
 
     public string LeadsInbox(Guid siteId) => Absolute($"manage/{siteId}/leads");
+
+    public string OrdersInbox(Guid siteId) => Absolute($"manage/{siteId}/orders");
 
     public string MagicLink(string token) => Absolute($"auth/verify?token={Uri.EscapeDataString(token)}");
 }

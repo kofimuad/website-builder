@@ -289,6 +289,25 @@ else
                         <p class="muted">Address and opening hours are edited on the Business details page.</p>
                         break;
 
+                    case ShopSection shop:
+                        @* A shop section had no case at all here, so adding one from the picker
+                           produced a block with nothing in it — no heading, no way to change
+                           anything, and no hint that the items live elsewhere. The section itself
+                           is only "put the shop here"; the products are relational and live, which
+                           is why this edits the wrapper and links out for the contents. *@
+                        <input class="edit h2" @bind="shop.Heading" @bind:event="oninput" @bind:after="MarkDirty" placeholder="Shop heading" />
+                        <textarea class="edit body" rows="2" @bind="shop.Intro" @bind:event="oninput" @bind:after="MarkDirty" placeholder="A line about what you sell (optional)"></textarea>
+                        <label class="shop-count">
+                            Show up to
+                            <input class="edit small" type="number" min="1" max="24" inputmode="numeric"
+                                   @bind="shop.MaxItems" @bind:event="oninput" @bind:after="MarkDirty" />
+                            items here
+                        </label>
+                        <p class="muted">Your items are edited on the <a href="/manage/@SiteId/products">Products</a>
+                            page, and changes to them go live straight away. This section only says where
+                            they appear &mdash; that part needs a publish, like every other section.</p>
+                        break;
+
                     case CtaSection cta:
                         <input class="edit h2" @bind="cta.Headline" @bind:event="oninput" @bind:after="MarkDirty" placeholder="Closing line" />
                         <input class="edit button" @bind="cta.ButtonLabel" @bind:event="oninput" @bind:after="MarkDirty" placeholder="Button text" />

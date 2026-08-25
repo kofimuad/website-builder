@@ -71,20 +71,41 @@
         /* ---------- top bar ---------- */
         .topbar {
             position: sticky; top: 0; z-index: 20;
-            display: flex; align-items: center; gap: 1rem;
-            padding: .7rem 1.25rem;
+            display: flex; align-items: center; gap: .6rem;
+            padding: .7rem 1rem;
             background: color-mix(in srgb, var(--background) 88%, transparent);
             backdrop-filter: blur(10px);
             border-bottom: 1px solid var(--edge);
         }
+        /* The brand gives way, the actions do not. With a basket in the bar there are three things
+           competing at 360px, and a long business name was wrapping "Call now" onto two lines with
+           it. The name truncates instead — it is also the page you are already on. */
         .topbar-brand {
             font-family: var(--font-heading); font-weight: 700; font-size: 1.05rem;
             color: var(--text); text-decoration: none; margin-right: auto;
+            min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
         .topbar-links { display: none; gap: 1.5rem; }
         .topbar-links a { color: var(--muted); text-decoration: none; font-size: .95rem; font-weight: 500; }
         .topbar-links a:hover { color: var(--text); }
-        .topbar .button { margin: 0; padding: .55rem 1.1rem; font-size: .9rem; }
+        .topbar .button { margin: 0; padding: .55rem 1.1rem; font-size: .9rem; white-space: nowrap; flex-shrink: 0; }
+        /* The basket. Quiet next to the call button, which stays the loudest thing in the bar —
+           most of these businesses would still rather be phoned than ordered from. */
+        .topbar-cart {
+            position: relative; display: inline-flex; align-items: center; gap: .4rem;
+            padding: .45rem .8rem; border-radius: 9999px; margin-left: .25rem;
+            border: 1px solid var(--edge); color: var(--text); text-decoration: none;
+            font-size: .9rem; font-weight: 600; white-space: nowrap;
+        }
+        .topbar-cart:hover { border-color: var(--primary); }
+        .topbar-cart { flex-shrink: 0; }
+        /* The word drops on a phone; the icon and the count carry it. */
+        .topbar-cart-label { display: none; }
+        .topbar-cart-count {
+            display: inline-flex; align-items: center; justify-content: center;
+            min-width: 1.35rem; height: 1.35rem; padding: 0 .3rem; border-radius: 9999px;
+            background: var(--primary); color: #fff; font-size: .75rem; font-weight: 700;
+        }
 
         /* ---------- hero ---------- */
         .hero {
@@ -242,6 +263,7 @@
             padding: .85rem; border: 1px solid var(--edge); border-radius: var(--radius);
             background: var(--background);
         }
+        .line-no-photo { grid-template-columns: 1fr auto; }
         .line img { width: 4rem; height: 4rem; object-fit: cover; border-radius: .5rem; }
         .line-name { font-weight: 600; }
         .line-meta { color: var(--muted); font-size: .9rem; }
@@ -255,7 +277,15 @@
             padding: 1rem 0; border-top: 2px solid var(--edge); margin-bottom: 1.5rem;
         }
         .totals strong { font-family: var(--font-heading); font-size: 1.4rem; }
-        .qty { display: inline-flex; align-items: center; gap: .5rem; }
+        /* "We'll confirm the total" is a sentence, not a number. At the heading size above it read
+           as the total itself and ran the width of a phone. */
+        .totals strong.line-meta { font-family: var(--font-body); font-size: 1rem; font-weight: 600; }
+        /* Wraps rather than squeezes. With a second button in this row, an inline-flex that could
+           not wrap shrank both of them at 360px until "Order now" broke over two lines and "Add to
+           order" collapsed into a circle. The buttons keep their width and move to the next line
+           instead. */
+        .qty { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+        .qty .button { flex: 0 0 auto; white-space: nowrap; cursor: pointer; }
         .qty input {
             width: 4rem; padding: .5rem; text-align: center;
             border: 1px solid var(--edge); border-radius: .5rem; font: inherit;
@@ -267,6 +297,57 @@
         }
         .crumbs { margin-bottom: 1.5rem; font-size: .95rem; }
         .crumbs a { color: var(--muted); }
+        /* The cart's secondary route. Quiet on purpose: placing the order is the one that records
+           it, and WhatsApp is the shortcut for people who would rather just message. */
+        .alt-order { color: var(--muted); font-size: .95rem; }
+        /* A second submit next to a filled one. It has to read as the lesser of the two without
+           reading as disabled, so it keeps the shape and drops the fill. */
+        .button.quiet {
+            background: none; color: var(--primary); box-shadow: none;
+            border: 1.5px solid color-mix(in srgb, var(--primary) 45%, transparent);
+        }
+        .button.quiet:hover { filter: none; border-color: var(--primary); }
+
+        /* ---------- checkout ---------- */
+        .checkout-layout { display: grid; gap: 2rem; align-items: start; }
+        .checkout-form { display: grid; gap: .4rem; }
+        .checkout-form label { font-weight: 600; margin-top: .6rem; }
+        .checkout-form input, .checkout-form textarea {
+            width: 100%; padding: .85rem 1rem;
+            border: 1px solid var(--edge); border-radius: .75rem;
+            font: inherit; color: var(--text); background: var(--background);
+        }
+        .checkout-form textarea { resize: vertical; }
+        .checkout-form input:focus, .checkout-form textarea:focus { outline: 2px solid var(--primary); outline-offset: 1px; }
+        .checkout-form .button { border: 0; cursor: pointer; justify-self: start; margin-top: 1rem; }
+        /* Same honeypot treatment as the enquiry form: off-screen rather than display:none, which
+           some bots check for. */
+        .checkout-form .hp { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+        .checkout-summary {
+            padding: 1.25rem; border: 1px solid var(--edge); border-radius: var(--radius);
+            background: var(--surface);
+        }
+        .checkout-summary h3 { margin-top: 0; }
+        .checkout-summary .totals { margin-bottom: 0; }
+        /* A cart line with no photo and no controls — a summary, not something to edit. */
+        .line-compact {
+            display: flex; justify-content: space-between; gap: 1rem; align-items: baseline;
+            padding: .5rem 0; border-bottom: 1px solid var(--edge);
+        }
+
+        /* ---------- order placed ---------- */
+        .order-done { max-width: 34rem; }
+        .order-ref {
+            display: flex; flex-direction: column; gap: .2rem;
+            padding: 1rem 1.25rem; margin: 1.5rem 0;
+            border-radius: var(--radius); border: 1px dashed var(--primary);
+            background: color-mix(in srgb, var(--primary) 8%, var(--background));
+            color: var(--muted); font-size: .95rem;
+        }
+        .order-ref strong {
+            font-family: var(--font-heading); font-size: 1.8rem; letter-spacing: .12em;
+            color: var(--text);
+        }
 
         /* ---------- contact ---------- */
         .contact-layout { display: grid; gap: 2rem; align-items: start; }
@@ -350,12 +431,15 @@
         /* Mobile first: widen only once there is room. */
         @@media (min-width: 45rem) {
             section { padding: 5rem 2rem; }
-            .topbar { padding: .8rem 2rem; }
+            .topbar { padding: .8rem 2rem; gap: 1rem; }
             .topbar-links { display: flex; }
+            .topbar-cart-label { display: inline; }
             .grid { grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); }
             .shots { grid-template-columns: repeat(3, 1fr); }
             .products { grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); }
             .about-layout, .contact-layout { grid-template-columns: 1fr 1fr; gap: 3rem; }
+            /* Summary narrower than the form: it is a reminder, not the task. */
+            .checkout-layout { grid-template-columns: 1.3fr 1fr; gap: 3rem; }
             .hero-photo img { height: clamp(20rem, 58vh, 34rem); }
             .hero-photo + .hero-body { padding: 2.5rem 2rem 3rem; }
             .hero-body { padding: 4rem 2rem 4.5rem; }

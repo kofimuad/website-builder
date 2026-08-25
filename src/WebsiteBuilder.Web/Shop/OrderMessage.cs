@@ -76,6 +76,47 @@ public static class OrderMessage
         return text.ToString().TrimEnd();
     }
 
+    /// <summary>
+    /// The message for an order that has already been placed and stored.
+    /// <para>
+    /// It leads with the reference, which is the whole difference from the cart version: the owner
+    /// has this order in their inbox and in their email already, so the message is no longer the
+    /// order itself but a pointer to it. Prices come from the line snapshots, not from the products,
+    /// so this still reads correctly after the owner has re-priced something.
+    /// </para>
+    /// </summary>
+    public static string ComposePlaced(string businessName, Order order)
+    {
+        ArgumentNullException.ThrowIfNull(order);
+
+        const string newLine = "\n";
+
+        var text = new StringBuilder();
+        text.Append("Hello ").Append(businessName).Append(", I've just placed order ")
+            .Append(order.Reference).Append(':').Append(newLine);
+
+        foreach (var item in order.Items)
+        {
+            text.Append("- ").Append(item.Quantity).Append(" x ").Append(item.ProductName);
+
+            if (item.LineTotalMinor is { } lineTotal)
+            {
+                text.Append(" (").Append(FormatMoney(lineTotal, item.Currency)).Append(')');
+            }
+
+            text.Append(newLine);
+        }
+
+        if (order.TotalMinor is { } total && order.Currency is { } currency)
+        {
+            text.Append(newLine).Append("Total: ").Append(FormatMoney(total, currency));
+        }
+
+        text.Append(newLine).Append("My name is ").Append(order.CustomerName).Append('.');
+
+        return text.ToString().TrimEnd();
+    }
+
     /// <summary>The wa.me link that opens WhatsApp with the order already typed.</summary>
     public static string Link(string whatsAppNumber, string message) =>
         $"https://wa.me/{whatsAppNumber.TrimStart('+')}?text={Uri.EscapeDataString(message)}";

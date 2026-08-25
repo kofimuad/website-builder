@@ -1,4 +1,9 @@
 @page "/"
+@using Microsoft.Extensions.Options
+@using WebsiteBuilder.Web.Platform
+@inject IOptions<PlatformOptions> PlatformOptions
+@inject PlatformUrls Urls
+@inject IWebHostEnvironment HostEnvironment
 
 <PageTitle>@Branding.Name — @Branding.Tagline</PageTitle>
 
@@ -27,7 +32,16 @@
             <p class="hero-subcopy">Answer a few plain questions and we build your site for you. Change any word or photo by tapping it — no design skills, no code, nothing to install.</p>
             <div class="hero-cta">
                 <a class="btn btn-primary btn-lg" href="/start">Start free</a>
-                <a class="btn btn-outline btn-lg" href="#example">See a live example @Icon("arrow-up-right")</a>
+                @* This pointed at "#example", an anchor that has never existed on this page, so
+                   the button did nothing at all. It now opens a real published site in a new tab —
+                   which is what the arrow icon has been promising. Rendered only when there is a
+                   site to show, because a button that goes nowhere is worse than no button. *@
+                @if (ExampleSiteUrl is { } example)
+                {
+                    <a class="btn btn-outline btn-lg" href="@example" target="_blank" rel="noopener">
+                        See a live example @Icon("arrow-up-right")
+                    </a>
+                }
             </div>
             <div class="hero-trust">
                 <span class="trust-check">@Icon("circle-check")</span>
@@ -197,6 +211,32 @@
 </div>
 
 @code {
+    /// <summary>
+    /// The published site behind "See a live example", or null when none is configured.
+    /// <para>
+    /// <c>Platform:ExampleSiteUrl</c> when set (<c>Platform__ExampleSiteUrl</c> on Railway — the
+    /// double underscore, not a colon). Locally it falls back to the seeded demo tenant, so the
+    /// button works out of the box in development without pointing production at a site that may
+    /// not exist there.
+    /// </para>
+    /// </summary>
+    private string? ExampleSiteUrl
+    {
+        get
+        {
+            var configured = PlatformOptions.Value.ExampleSiteUrl;
+
+            if (!string.IsNullOrWhiteSpace(configured))
+            {
+                return configured;
+            }
+
+            return HostEnvironment.IsDevelopment()
+                ? Urls.TenantSite(WebsiteBuilder.Web.Development.DemoDataSeeder.DemoSubdomain)
+                : null;
+        }
+    }
+
     private record Step(string Number, string Title, string Desc);
     private record Template(string Title, string Desc, string Color);
     private record Feature(string Icon, string Title, string Desc);
