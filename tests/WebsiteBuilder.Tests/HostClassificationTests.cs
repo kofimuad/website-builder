@@ -28,6 +28,7 @@ public class HostClassificationTests
     [InlineData("mail")]
     [InlineData("smtp")]
     [InlineData("bounces")]
+    [InlineData("portal")]
     public void Labels_carrying_mail_dns_records_are_never_tenants(string label)
     {
         // These names hold real MX, SPF and DKIM records — Resend's verification puts them on
