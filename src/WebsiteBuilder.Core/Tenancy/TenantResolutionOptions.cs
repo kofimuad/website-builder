@@ -38,6 +38,8 @@ public sealed class TenantResolutionOptions
         // Anything a customer could mistake for us asking them for something.
         "login", "signin", "signup", "auth", "account", "accounts", "billing", "pay",
         "secure", "verify", "password", "support", "help",
+        // Other applications that live on this domain. Each has its own DNS records.
+        "portal",
         // Operations, so the names stay available when we need them.
         "status", "staging", "stage", "dev", "test", "preview", "docs", "blog",
     ];
